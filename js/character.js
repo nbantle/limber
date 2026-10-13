@@ -30,7 +30,7 @@ const LINES = {
   hipFlexors: ['th', 0, 0.4, 1], adductors: ['th', 0.15, 0.8, 0], calves: ['sh', 0.1, 0.62, -1],
   chest: ['torso', 0.6, 0.88, 1], abs: ['torso', 0.18, 0.56, 1], obliques: ['torso', 0.2, 0.62, 0],
   lowerBack: ['torso', 0.08, 0.44, -1], upperBack: ['torso', 0.58, 0.9, -1], lats: ['torso', 0.42, 0.84, -0.5],
-  traps: ['torso', 0.84, 1, -1], neck: ['neck', 0, 1, 0], shoulders: ['ua', 0, 0.38, 0],
+  traps: ['torso', 0.84, 1, -1], neck: ['neck', -0.2, 0.42, 0], shoulders: ['ua', 0, 0.38, 0],
   biceps: ['ua', 0.22, 0.88, 1], triceps: ['ua', 0.22, 0.88, -1], forearms: ['fa', 0.12, 0.8, 0],
 };
 
@@ -178,12 +178,15 @@ export function paint(J, view, hot, hotSegs) {
       ops.push(circle(P(0, 0.12), 1.03 * r, S.hair));
       ops.push(circle(P(-0.92, -0.08), 0.2 * r, shade(S.skin, 0.08)));
       ops.push(circle(P(0.92, -0.08), 0.2 * r, shade(S.skin, 0.08)));
-      ops.push(circle(P(0, -0.1), 0.88 * r, S.skin));
-      ops.push(path(ribbon([P(-0.6, 0.62), P(0.6, 0.62)], [0.18 * r, 0.18 * r]), S.hair));
-      ops.push(circle(P(-0.33, 0.04), 0.1 * r, EYE));
-      ops.push(circle(P(0.33, 0.04), 0.1 * r, EYE));
-      ops.push(circle(P(-0.5, -0.32), 0.15 * r, '#ff7a8a', { opacity: 0.3 }));
-      ops.push(circle(P(0.5, -0.32), 0.15 * r, '#ff7a8a', { opacity: 0.3 }));
+      // Head turn shifts the face features toward one side.
+      const tn = Math.max(-1, Math.min(1, J.turn ?? 0)) * 0.42;
+      ops.push(circle(P(tn * 0.25, -0.1), 0.88 * r, S.skin));
+      ops.push(path(ribbon([P(-0.6 + tn * 0.5, 0.62), P(0.6 + tn * 0.5, 0.62)], [0.18 * r, 0.18 * r]), S.hair));
+      for (const ex of [-0.33, 0.33]) {
+        const x = ex + tn * (1 - Math.abs(ex + tn) * 0.4);
+        if (Math.abs(x) < 0.8) ops.push(circle(P(x, 0.04), 0.1 * r, EYE));
+        ops.push(circle(P(x * 1.4, -0.32), 0.15 * r, '#ff7a8a', { opacity: Math.abs(x) < 0.7 ? 0.3 : 0 }));
+      }
     }
   };
 

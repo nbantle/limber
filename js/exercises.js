@@ -2,6 +2,10 @@
 // type: 'stretch' | 'strength'. mode: 'time' | 'reps'. sided: done once per side.
 // Animation poses are documented in figure.js.
 
+import { MORE, AREAS } from './exercises-more.js';
+
+export { AREAS };
+
 export const MUSCLES = {
   neck: 'Neck',
   traps: 'Traps',
@@ -80,7 +84,7 @@ export const EXERCISES = [
     id: 'standing-quad', name: 'Standing Quad Stretch', type: 'stretch', mode: 'time', duration: 30, sided: true,
     primary: ['quads'], secondary: ['hipFlexors'],
     cues: ['Stand tall and hold something for balance if you need to.', 'Bend one knee and hold your ankle behind you.', 'Keep knees close together and tuck your hips slightly under.', 'Feel the stretch along the front of the thigh.'],
-    anim: { anchor: 'ankleL', dur: 2.4, frames: [
+    anim: { anchor: 'ankleL', props: [{ type: 'wall', at: 'handL', dx: 1.8 }], dur: 2.4, frames: [
       { t: 0, aL: [100, 95], aR: [219, 172], lL: [180, 180], lR: [185, 345, 300] },
       { t: 0, aL: [100, 95], aR: [226, 172], lL: [180, 180], lR: [195, 352, 300] },
     ] },
@@ -185,7 +189,7 @@ export const EXERCISES = [
     ] },
   },
   {
-    id: 'arm-circles', name: 'Arm Circles', type: 'stretch', mode: 'time', duration: 30,
+    id: 'arm-circles', name: 'Arm Circles', type: 'stretch', mode: 'time', duration: 30, halfway: 'Switch directions.',
     primary: ['shoulders'], secondary: ['upperBack'],
     cues: ['Stand tall with arms out to the sides at shoulder height.', 'Make small, controlled circles.', 'Gradually make the circles bigger.', 'Switch direction halfway through.'],
     anim: { view: 'front', dur: 0.32, hold: 0, frames: [
@@ -411,7 +415,39 @@ export const EXERCISES = [
   },
 ];
 
+EXERCISES.push(...MORE);
+
 export const STARTER_ROUTINES = [
+  {
+    name: '12-Minute Stretch',
+    rest: 5,
+    steps: [
+      { ex: 'calf-stretch', duration: 35 },
+      { ex: 'standing-quad', duration: 25 },
+      { ex: 'low-lunge', duration: 30 },
+      { ex: 'cobra', duration: 30 },
+      { ex: 'childs-pose', duration: 30 },
+      { ex: 'cat-cow', duration: 40 },
+      { ex: 'downward-dog', duration: 30 },
+      { ex: 'figure-four', duration: 30 },
+      { ex: 'seated-single-hamstring', duration: 30 },
+      { ex: 'lying-twist', duration: 30 },
+      { ex: 'double-knee-chest', duration: 30 },
+      { ex: 'cross-body-shoulder', duration: 25 },
+    ],
+  },
+  {
+    name: 'Desk Break',
+    rest: 3,
+    steps: [
+      { ex: 'neck-tilts', duration: 30 },
+      { ex: 'neck-turns', duration: 30 },
+      { ex: 'shoulder-rolls', duration: 30 },
+      { ex: 'levator-scapulae', duration: 20 },
+      { ex: 'shoulder-rotation', reps: 12 },
+      { ex: 'wrist-ankle-circles', duration: 20 },
+    ],
+  },
   {
     name: 'Morning Mobility',
     rest: 5,

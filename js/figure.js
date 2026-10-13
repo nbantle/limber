@@ -6,7 +6,10 @@ import { paint } from './character.js';
 // 180 = down, 270 (or -90) = backward. Side-view figures face right; "R" limbs are the
 // near side and "L" limbs the far side. In front view, "L" is the screen-left limb.
 //
-// pose = { t: torso, h: head, aL/aR: [upperArm, forearm], lL/lR: [thigh, shin, foot?], lift }
+// pose = { t: torso, h: head, aL/aR: [upperArm, forearm], lL/lR: [thigh, shin, foot?], lift,
+//          c: spine curve, sy: shoulder lift, turn: head turn (-1..1, front view),
+//          kth/kfa: thigh/forearm length factor for limbs pointing at the viewer (number or [L, R]) }
+// anim.top draws a lying figure seen from above (front view rules, no floor).
 
 const LEN = { torso: 24, shoulderAt: 21, neck: 2.5, headR: 5, ua: 12.5, fa: 12, th: 18, sh: 18, foot: 6, footFront: 3.2 };
 const WID = { torso: 10, neck: 3.6, ua: 4.7, fa: 3.6, th: 7.4, sh: 5.1, foot: 3.9 };
@@ -17,6 +20,7 @@ const rad = (a) => (a * Math.PI) / 180;
 const dir = (a) => [Math.sin(rad(a)), -Math.cos(rad(a))];
 const add = (p, a, len) => { const d = dir(a); return [p[0] + d[0] * len, p[1] + d[1] * len]; };
 const ease = (u) => 0.5 - 0.5 * Math.cos(Math.PI * u);
+const side = (v, s) => (Array.isArray(v) ? v[s === 'L' ? 0 : 1] : v ?? 1);
 
 function solve(pose, view) {
   const front = view === 'front';
@@ -24,10 +28,11 @@ function solve(pose, view) {
   const h = pose.h ?? t;
   const J = {};
   J.c = pose.c ?? 0;
+  J.turn = pose.turn ?? 0;
   J.hip = [0, 0];
   J.neck = add(J.hip, t, LEN.torso);
   J.head = add(J.neck, h, LEN.neck + LEN.headR);
-  const sh = add(J.hip, t, LEN.shoulderAt);
+  const sh = add(J.hip, t, LEN.shoulderAt + (pose.sy ?? 0));
   const p = front ? dir(t + 90) : [0, 0];
   J.shoulderL = [sh[0] - p[0] * 7, sh[1] - p[1] * 7];
   J.shoulderR = [sh[0] + p[0] * 7, sh[1] + p[1] * 7];
@@ -36,9 +41,9 @@ function solve(pose, view) {
   for (const s of ['L', 'R']) {
     const [u, f] = pose['a' + s] ?? [180, 180];
     J['elbow' + s] = add(J['shoulder' + s], u, LEN.ua);
-    J['hand' + s] = add(J['elbow' + s], f, LEN.fa);
+    J['hand' + s] = add(J['elbow' + s], f, LEN.fa * side(pose.kfa, s));
     const [th, shn, ft] = pose['l' + s] ?? [180, 180];
-    J['knee' + s] = add(J['hip' + s], th, LEN.th);
+    J['knee' + s] = add(J['hip' + s], th, LEN.th * side(pose.kth, s));
     J['ankle' + s] = add(J['knee' + s], shn, LEN.sh);
     J['footAngle' + s] = ft ?? (front ? (s === 'L' ? shn + 90 : shn - 90) : 90);
     J['toe' + s] = add(J['ankle' + s], J['footAngle' + s], front ? LEN.footFront : LEN.foot);
@@ -73,7 +78,7 @@ function contactPoints(J, exclude) {
 function interp(a, b, u) {
   const out = {};
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  const def = { t: 0, c: 0, lift: 0, aL: [180, 180], aR: [180, 180], lL: [180, 180], lR: [180, 180] };
+  const def = { t: 0, c: 0, lift: 0, sy: 0, turn: 0, kth: 1, kfa: 1, aL: [180, 180], aR: [180, 180], lL: [180, 180], lR: [180, 180] };
   for (const k of keys) {
     let va = a[k] ?? (k === 'h' ? a.t ?? 0 : def[k]);
     let vb = b[k] ?? (k === 'h' ? b.t ?? 0 : def[k]);
@@ -118,9 +123,9 @@ function ik(J, s, target, kind) {
 // Build a sampler for an exercise animation: returns world-space joints at time t (seconds).
 export function makeRig(anim) {
   const frames = anim.frames;
-  const view = anim.view ?? 'side';
+  const view = anim.top ? 'front' : anim.view ?? 'side';
   const dur = anim.dur ?? 1.4;
-  const anchor = anim.anchor ?? (view === 'front' ? 'hip' : 'ankleR');
+  const anchor = anim.anchor ?? (view === 'front' || anim.top ? 'hip' : 'ankleR');
   const plant = new Set(anim.plant ?? []);
   const cycle = frames.length * dur;
 
@@ -138,7 +143,7 @@ export function makeRig(anim) {
     const J = solve(pose, view);
     let dx = 0, dy = 0;
     if (ref) dx = ref.anchor[0] - J[anchor][0];
-    if (anim.hang) {
+    if (anim.hang || anim.top) {
       if (ref) dy = ref.anchor[1] - J[anchor][1];
     } else {
       const pts = contactPoints(J, plant);
@@ -165,6 +170,7 @@ export function makeRig(anim) {
     if (pr.type === 'wall') return { type: 'wall', x: j[0] + (pr.dx ?? 0) };
     if (pr.type === 'bar') return { type: 'bar', x: j[0] + (pr.dx ?? 0), y: j[1] - 1.5, w: pr.w ?? 34 };
     if (pr.type === 'box') return { type: 'box', x: j[0] + (pr.dx ?? 0), y: j[1] + (pr.dy ?? 2), w: pr.w ?? 16 };
+    if (pr.type === 'chair') return { type: 'chair', x: j[0] + (pr.dx ?? 0), y: j[1] + 4.6, front: view === 'front' };
     return null;
   }).filter(Boolean);
 
@@ -177,14 +183,18 @@ export function makeRig(anim) {
     for (const s of segments(J, view)) { grow(...s.a, s.w / 2); grow(...s.b, s.w / 2); }
     grow(...J.head, LEN.headR);
   }
-  if (!anim.hang) grow(x0, 0);
+  if (!anim.hang && !anim.top) grow(x0, 0);
   for (const pr of props) {
     if (pr.type === 'wall') grow(pr.x, y0), grow(pr.x, 0);
     if (pr.type === 'bar') grow(pr.x - pr.w / 2, pr.y - 2), grow(pr.x + pr.w / 2, pr.y);
     if (pr.type === 'box') grow(pr.x - pr.w / 2, pr.y), grow(pr.x + pr.w / 2, 0);
+    if (pr.type === 'chair') grow(pr.x - 10, pr.y - 24), grow(pr.x + 10, 0);
   }
+  // Floor exercises get a yoga mat.
+  const nearFloor = ['hip', 'kneeL', 'kneeR', 'handL', 'handR', 'neck'].some((k) => J0[k][1] > -7.5);
+  const mat = anim.top || (anim.mat ?? (!anim.hang && nearFloor));
   const bbox = [x0, y0, x1, y1];
-  return { at, atFrame, view, cycle, bbox, props, hang: !!anim.hang };
+  return { at, atFrame, view, cycle, bbox, props, mat, hang: !!anim.hang, top: !!anim.top };
 }
 
 function fitBox(bbox, aspect, pad = 7) {
@@ -205,6 +215,19 @@ const el = (tag, attrs = {}, parent) => {
   return e;
 };
 
+function drawChair(svg, { x, y, front }) {
+  const g = el('g', { class: 'fig-chair' }, svg);
+  if (front) {
+    el('rect', { x: x - 8.5, y: y - 24, width: 17, height: 22, rx: 2.5, class: 'back' }, g);
+    for (const dx of [-8.5, -6, 6, 8.5]) el('line', { x1: x + dx, x2: x + dx, y1: y, y2: 0 }, g);
+    el('rect', { x: x - 10, y, width: 20, height: 2.6, rx: 1.2 }, g);
+  } else {
+    el('line', { x1: x - 7, x2: x - 7, y1: y - 22, y2: 0 }, g);
+    el('line', { x1: x + 6, x2: x + 6, y1: y, y2: 0 }, g);
+    el('rect', { x: x - 8, y, width: 15, height: 2.6, rx: 1.2 }, g);
+  }
+}
+
 // Renders an exercise figure into `container`. Returns a controller.
 export function renderFigure(container, exercise, { animate = true, aspect = 1.3, frame = null, highlight = true } = {}) {
   const anim = exercise.anim;
@@ -212,11 +235,17 @@ export function renderFigure(container, exercise, { animate = true, aspect = 1.3
   const [vx, vy, vw, vh] = fitBox(rig.bbox, aspect);
   const svg = el('svg', { viewBox: `${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}`, class: 'figure', role: 'img', 'aria-label': exercise.name });
   const hl = new Set(highlight ? exercise.primary ?? [] : []);
-  if (!rig.hang) el('line', { x1: vx, x2: vx + vw, y1: 0.2, y2: 0.2, class: 'fig-ground' }, svg);
+  const [bx0, by0, bx1, by1] = rig.bbox;
+  if (rig.top) el('rect', { x: bx0 - 3, y: by0 - 3, width: bx1 - bx0 + 6, height: by1 - by0 + 6, rx: 3, class: 'fig-mat' }, svg);
+  else if (!rig.hang) {
+    if (rig.mat) el('path', { d: `M${bx0 - 1} 0.2L${bx1 + 1} 0.2L${bx1 + 4} 2.6L${bx0 - 4} 2.6Z`, class: 'fig-mat' }, svg);
+    el('line', { x1: vx, x2: vx + vw, y1: 0.2, y2: 0.2, class: 'fig-ground' }, svg);
+  }
   for (const pr of rig.props) {
     if (pr.type === 'wall') el('line', { x1: pr.x, x2: pr.x, y1: 0, y2: vy, class: 'fig-wall' }, svg);
     if (pr.type === 'bar') el('line', { x1: pr.x - pr.w / 2, x2: pr.x + pr.w / 2, y1: pr.y, y2: pr.y, class: 'fig-bar' }, svg);
     if (pr.type === 'box') el('rect', { x: pr.x - pr.w / 2, y: pr.y, width: pr.w, height: -pr.y, rx: 1.2, class: 'fig-box' }, svg);
+    if (pr.type === 'chair') drawChair(svg, pr);
   }
   const g = el('g', {}, svg);
   let nodes = [];

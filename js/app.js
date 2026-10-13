@@ -1,4 +1,4 @@
-import { EXERCISES, STARTER_ROUTINES, MUSCLES } from './exercises.js';
+import { EXERCISES, STARTER_ROUTINES, MUSCLES, AREAS } from './exercises.js';
 import { renderFigure } from './figure.js';
 import { COACHES, SKINS, setLook } from './character.js';
 import { muscleMapSVG } from './muscles.js';
@@ -409,17 +409,18 @@ function stepRow(s, i, n, isOpen) {
 
 // Exercise picker sheet: tap to add to routine.
 function pickExercises(routine, onDone) {
-  let filter = 'all', q = '';
+  let filter = 'all', q = '', area = 'all';
   const figs = [];
   const s = sheet(`
     <div class="sheet-head"><h3>Add exercises</h3><button class="btn small primary" data-act="done">Done</button></div>
     <div class="search">${icon('search')}<input type="search" placeholder="Search exercises or muscles" aria-label="Search"></div>
     <div class="chips" role="group">${['all', 'stretch', 'strength'].map((f) => `<button class="chip ${f === 'all' ? 'on' : ''}" data-f="${f}">${f === 'all' ? 'All' : f === 'stretch' ? 'Stretches' : 'Strength'}</button>`).join('')}</div>
+    ${areaChips('all')}
     <div class="pick-list"></div>`, { cls: 'tall', onClose: () => { figs.forEach((f) => f.stop()); onDone(); } });
   const list = $('.pick-list', s.el);
   const draw = () => {
     figs.splice(0).forEach((f) => f.stop());
-    const items = filterExercises(allExercises(), filter, q);
+    const items = filterExercises(allExercises(), filter, q, area);
     list.innerHTML = items.map((ex) => `<button class="pick" data-id="${ex.id}" style="--acc:${typeVar(ex.type)}">
       <span class="pick-thumb" data-ex="${ex.id}"></span>
       <span class="pick-text"><span class="pick-name">${esc(ex.name)}</span><span class="pick-sub">${esc(muscleNames(ex.primary))}</span></span>
@@ -428,7 +429,8 @@ function pickExercises(routine, onDone) {
   };
   s.el.addEventListener('click', (e) => {
     const c = e.target.closest('.chip');
-    if (c) { filter = c.dataset.f; $$('.chip', s.el).forEach((x) => x.classList.toggle('on', x === c)); draw(); return; }
+    if (c?.dataset.area) { area = c.dataset.area; $$('[data-area]', s.el).forEach((x) => x.classList.toggle('on', x === c)); draw(); return; }
+    if (c) { filter = c.dataset.f; $$('[data-f]', s.el).forEach((x) => x.classList.toggle('on', x === c)); draw(); return; }
     if (e.target.closest('[data-act="done"]')) { s.close(); return; }
     const p = e.target.closest('.pick');
     if (p) {
@@ -443,9 +445,12 @@ function pickExercises(routine, onDone) {
   draw();
 }
 
-function filterExercises(list, filter, q) {
+const areaChips = (area) => `<div class="chips area-chips" role="group" aria-label="Body area">${[['all', 'Whole body'], ...Object.entries(AREAS).map(([k, a]) => [k, a.label])].map(([k, l]) => `<button class="chip ${k === area ? 'on' : ''}" data-area="${k}">${l}</button>`).join('')}</div>`;
+
+function filterExercises(list, filter, q, area = 'all') {
   q = q.trim().toLowerCase();
-  return list.filter((ex) => (filter === 'all' || ex.type === filter) &&
+  const inArea = (ex) => area === 'all' || (ex.primary ?? []).some((m) => AREAS[area].muscles.includes(m));
+  return list.filter((ex) => (filter === 'all' || ex.type === filter) && inArea(ex) &&
     (!q || ex.name.toLowerCase().includes(q) || [...(ex.primary ?? []), ...(ex.secondary ?? [])].some((m) => (MUSCLES[m] ?? m).toLowerCase().includes(q))));
 }
 
@@ -497,7 +502,7 @@ function viewImport(data) {
 
 // ───────────────────────── Library ─────────────────────────
 
-let libFilter = 'all', libQuery = '';
+let libFilter = 'all', libQuery = '', libArea = 'all';
 
 function viewLibrary() {
   const figs = [];
@@ -505,11 +510,14 @@ function viewLibrary() {
     <header class="top"><h1>Exercises</h1><a class="btn-icon accent" href="#/custom/new" aria-label="New custom exercise">${icon('plus')}</a></header>
     <div class="search">${icon('search')}<input type="search" placeholder="Search exercises or muscles" value="${esc(libQuery)}" aria-label="Search"></div>
     <div class="chips">${['all', 'stretch', 'strength'].map((f) => `<button class="chip ${f === libFilter ? 'on' : ''}" data-f="${f}">${f === 'all' ? 'All' : f === 'stretch' ? 'Stretches' : 'Strength'}</button>`).join('')}</div>
+    ${areaChips(libArea)}
+    <p class="lib-count muted small"></p>
     <div class="ex-grid"></div>`;
   const grid = $('.ex-grid', app);
   const draw = () => {
     figs.splice(0).forEach((f) => f.stop());
-    const items = filterExercises(allExercises(), libFilter, libQuery);
+    const items = filterExercises(allExercises(), libFilter, libQuery, libArea);
+    $('.lib-count', app).textContent = `${items.length} exercise${items.length === 1 ? '' : 's'}`;
     grid.innerHTML = items.map((ex) => `<a class="ex-card" href="#/exercise/${ex.id}" style="--acc:${typeVar(ex.type)}">
       <span class="ex-thumb" data-ex="${ex.id}"></span>
       <span class="ex-name">${esc(ex.name)}</span>
@@ -520,7 +528,8 @@ function viewLibrary() {
   };
   app.onclick = (e) => {
     const c = e.target.closest('.chip');
-    if (c) { libFilter = c.dataset.f; $$('.chip', app).forEach((x) => x.classList.toggle('on', x === c)); draw(); }
+    if (c?.dataset.area) { libArea = c.dataset.area; $$('[data-area]', app).forEach((x) => x.classList.toggle('on', x === c)); draw(); return; }
+    if (c) { libFilter = c.dataset.f; $$('[data-f]', app).forEach((x) => x.classList.toggle('on', x === c)); draw(); }
   };
   $('.search input', app).addEventListener('input', (e) => { libQuery = e.target.value; draw(); });
   draw();
@@ -931,7 +940,10 @@ function viewPlayer(id) {
       }
       const whole = Math.ceil(remain / 1000);
       if (lastWhole !== null && whole !== lastWhole && whole <= 3 && whole >= 1) beep(660, 0.1);
-      if (p.kind === 'work' && lastWhole !== null && whole !== lastWhole && whole === Math.round(p.dur / 2) && p.dur >= 40) say('Halfway.');
+      if (p.kind === 'work' && lastWhole !== null && whole !== lastWhole && whole === Math.round(p.dur / 2)) {
+        if (p.ex.halfway && p.dur >= 10) say(p.ex.halfway);
+        else if (p.dur >= 40) say('Halfway.');
+      }
       lastWhole = whole;
       el.ring.style.strokeDashoffset = String(RING_C * (1 - remain / total));
       el.timeB.textContent = fmtClock(remain / 1000);
