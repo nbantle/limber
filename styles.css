@@ -310,6 +310,7 @@ svg.figure { width: 100%; height: 100%; display: block; }
 .fig-bar { stroke: #8a94a6; stroke-width: 2.4; stroke-linecap: round; }
 .fig-box { fill: #d6dfe8; }
 .fig-mat { fill: #cde8f6; }
+.fig-shadow { fill: rgba(30, 40, 60, .1); }
 .fig-chair line { stroke: #a9b6c3; stroke-width: 1.6; stroke-linecap: round; }
 .fig-chair rect { fill: #b9c5d1; }
 .fig-chair rect.back { fill: #d2dbe4; }

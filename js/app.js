@@ -1,6 +1,6 @@
 import { EXERCISES, STARTER_ROUTINES, MUSCLES, AREAS } from './exercises.js';
 import { renderFigure } from './figure.js';
-import { COACHES, SKINS, setLook } from './character.js';
+import { COACHES, SKINS, setLook } from './character2.js';
 import { muscleMapSVG } from './muscles.js';
 import { audio, wakeLock } from './audio.js';
 

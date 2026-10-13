@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Character Options</title>
+<style>
+  :root { --bg: #0f1115; --card: #f1f5f9; --text: #f1f2f5; --muted: #9aa1ad; --line: #2a2e37; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  .intro { color: var(--muted); margin: 0 0 24px; max-width: 760px; }
+  section { border-top: 1px solid var(--line); padding: 22px 0 8px; }
+  h2 { font-size: 21px; margin: 0 0 4px; }
+  .blurb { color: var(--muted); margin: 0 0 14px; max-width: 760px; }
+  .row { display: grid; grid-template-columns: 70px repeat(6, 1fr); gap: 8px; align-items: stretch; margin-bottom: 8px; }
+  .who { display: flex; align-items: center; font-weight: 700; color: var(--muted); font-size: 13px; }
+  .cell { background: var(--card); border-radius: 14px; overflow: hidden; position: relative; aspect-ratio: 0.82; }
+  .cell svg { width: 100%; height: 100%; display: block; }
+  .cap { position: absolute; left: 8px; top: 6px; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #6b7482; text-transform: uppercase; }
+  .cell.na { display: grid; place-items: center; color: #9aa3b0; font-size: 12px; }
+  .fig-ground { stroke: #b6daee; stroke-width: 1.1; }
+  .fig-mat { fill: #cde8f6; }
+  .fig-wall { stroke: #8fcdec; stroke-width: 1.3; stroke-dasharray: 3 2.2; }
+  @media (max-width: 760px) { .row { grid-template-columns: repeat(3, 1fr); } .who { grid-column: 1 / -1; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Coach character options</h1>
+  <p class="intro">Three directions for the person demonstrating each move, drawn from the front, side, and back, plus three exercise poses (they animate). The worked muscles are highlighted in each. Everything runs on the same skeleton the app already uses, so the chosen style will move exactly like this. Mix-and-match is fine — e.g. "B's outlines with A's colors."</p>
+  <div id="sections"></div>
+</main>
+<script type="module">
+import { makeRig, renderFigure } from '../js/figure.js';
+import { EXERCISES } from '../js/exercises.js';
+import { paint2, STYLES } from '../js/character2.js';
+
+const NS = 'http://www.w3.org/2000/svg';
+const ex = (id) => EXERCISES.find((e) => e.id === id);
+const FRONT = { view: 'front', frames: [{ t: 0, aL: [187, 183], aR: [173, 177], lL: [181, 180], lR: [179, 180] }] };
+const SIDE = { frames: [{ t: 0, aL: [174, 178], aR: [186, 182] }] };
+const COLS = [
+  { cap: 'Front', anim: FRONT, view: 'front' },
+  { cap: 'Side', anim: SIDE, view: 'side' },
+  { cap: 'Back', anim: FRONT, view: 'back' },
+  { cap: 'Squat', ex: 'squat' },
+  { cap: 'Low lunge', ex: 'low-lunge' },
+  { cap: 'Down dog', ex: 'downward-dog' },
+];
+
+function cell(parent, col, style, who) {
+  const div = document.createElement('div');
+  div.className = 'cell';
+  div.innerHTML = `<span class="cap">${col.cap}</span>`;
+  parent.append(div);
+  const e = col.ex ? ex(col.ex) : null;
+  const anim = e ? e.anim : col.anim;
+  const view = col.view ?? (anim.view ?? 'side');
+  const rig = makeRig(anim);
+  let [x0, y0, x1, y1] = rig.bbox;
+  x0 -= 7; x1 += 7; y0 -= 9; y1 += 4;
+  let w = x1 - x0, h = y1 - y0;
+  const aspect = 0.82;
+  if (w / h < aspect) { const nw = h * aspect; x0 -= (nw - w) / 2; w = nw; } else { const nh = w / aspect; y0 -= (nh - h) * 0.7; h = nh; }
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', `${x0} ${y0} ${w} ${h}`);
+  div.append(svg);
+  const mk = (tag, attrs, p = svg) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); p.append(n); return n; };
+  if (rig.mat) mk('path', { d: `M${rig.bbox[0] - 1} 0.2L${rig.bbox[2] + 1} 0.2L${rig.bbox[2] + 4} 2.6L${rig.bbox[0] - 4} 2.6Z`, class: 'fig-mat' });
+  mk('line', { x1: x0, x2: x0 + w, y1: 0.2, y2: 0.2, class: 'fig-ground' });
+  for (const pr of rig.props) if (pr.type === 'wall') mk('line', { x1: pr.x, x2: pr.x, y1: 0, y2: y0, class: 'fig-wall' });
+  const shadow = STYLES[style].shadow ? mk('ellipse', { cy: 0.4, ry: 1.3, fill: 'rgba(30,40,60,.10)' }) : null;
+  const g = mk('g', {});
+  let nodes = [];
+  const draw = (J) => {
+    const ops = paint2(J, view, style, who, e ? e.primary : [], e?.anim.hotSegs);
+    if (ops.length !== nodes.length || ops.some((o, i) => nodes[i].tagName !== o.tag)) { g.replaceChildren(); nodes = ops.map((o) => mk(o.tag, {}, g)); }
+    ops.forEach((o, i) => { for (const k in o) if (k !== 'tag') nodes[i].setAttribute(k, o[k]); });
+    if (shadow) {
+      const xs = ['ankleL', 'ankleR', 'hip'].map((k) => J[k][0]);
+      shadow.setAttribute('cx', (Math.min(...xs) + Math.max(...xs)) / 2);
+      shadow.setAttribute('rx', Math.max(6, (Math.max(...xs) - Math.min(...xs)) / 2 + 5));
+    }
+  };
+  if (e) {
+    const t0 = performance.now();
+    const loop = (now) => { draw(rig.at((now - t0) / 1000)); requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+  } else draw(rig.atFrame(0));
+}
+
+function currentCell(parent, col) {
+  const div = document.createElement('div');
+  div.className = 'cell';
+  div.innerHTML = `<span class="cap">${col.cap}</span><div style="position:absolute;inset:0"></div>`;
+  parent.append(div);
+  if (col.view === 'back') { div.classList.add('na'); div.lastChild.remove(); div.insertAdjacentHTML('beforeend', 'No back view'); return; }
+  const e = col.ex ? ex(col.ex) : { name: col.cap, primary: [], anim: col.anim };
+  renderFigure(div.lastChild, e, { aspect: 0.82, animate: !!col.ex });
+}
+
+const root = document.getElementById('sections');
+{
+  const s = document.createElement('section');
+  s.innerHTML = `<h2>Current</h2><p class="blurb">What the app draws today, for comparison.</p>`;
+  const row = document.createElement('div'); row.className = 'row';
+  row.innerHTML = '<div class="who">Ava</div>';
+  s.append(row); root.append(s);
+  COLS.forEach((c) => currentCell(row, c));
+}
+for (const [key, st] of Object.entries(STYLES)) {
+  const s = document.createElement('section');
+  s.innerHTML = `<h2>${st.label}</h2><p class="blurb">${st.blurb}</p>`;
+  root.append(s);
+  for (const who of ['ava', 'max']) {
+    const row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = `<div class="who">${key === 'form' ? (who === 'ava' ? 'Female' : 'Male') : who === 'ava' ? 'Ava' : 'Max'}</div>`;
+    s.append(row);
+    COLS.forEach((c) => cell(row, c, key, who));
+  }
+}
+</script>
+</body>
+</html>

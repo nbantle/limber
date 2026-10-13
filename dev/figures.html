@@ -8,7 +8,7 @@ body{font:12px -apple-system;background:#111;color:#ddd;margin:8px;min-height:0}
 <label><input type=checkbox id=st> static frames</label>
 <div class=grid id=g></div>
 <script type=module>
-import {EXERCISES} from '../js/exercises.js'; import {renderFigure} from '../js/figure.js'; import {setLook} from '../js/character.js';
+import {EXERCISES} from '../js/exercises.js'; import {renderFigure} from '../js/figure.js'; import {setLook} from '../js/character2.js';
 const qp=new URLSearchParams(location.search); setLook(qp.get('coach')||'a', +(qp.get('skin')??1));
 const g=document.getElementById('g');
 const draw=()=>{g.innerHTML='';const st=document.getElementById('st').checked;

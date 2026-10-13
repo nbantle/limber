@@ -1,4 +1,4 @@
-import { paint } from './character.js';
+import { paint } from './character2.js';
 
 // Animated figure renderer.
 //
@@ -247,9 +247,15 @@ export function renderFigure(container, exercise, { animate = true, aspect = 1.3
     if (pr.type === 'box') el('rect', { x: pr.x - pr.w / 2, y: pr.y, width: pr.w, height: -pr.y, rx: 1.2, class: 'fig-box' }, svg);
     if (pr.type === 'chair') drawChair(svg, pr);
   }
+  const shadow = rig.hang || rig.top ? null : el('ellipse', { cy: 0.4, ry: 1.3, class: 'fig-shadow' }, svg);
   const g = el('g', {}, svg);
   let nodes = [];
   const draw = (J) => {
+    if (shadow) {
+      const xs = ['ankleL', 'ankleR', 'hip'].map((k) => J[k][0]);
+      shadow.setAttribute('cx', ((Math.min(...xs) + Math.max(...xs)) / 2).toFixed(2));
+      shadow.setAttribute('rx', Math.max(6, (Math.max(...xs) - Math.min(...xs)) / 2 + 5).toFixed(2));
+    }
     const ops = paint(J, rig.view, hl, anim.hotSegs);
     if (ops.length !== nodes.length || ops.some((o, i) => nodes[i].tagName !== o.tag)) {
       g.replaceChildren();
