@@ -207,7 +207,7 @@ export const MORE = [
     id: 'knee-circles', name: 'Knee Circles', type: 'stretch', mode: 'time', duration: 30, halfway: 'Switch directions.',
     primary: ['quads', 'calves'], secondary: ['hamstrings'],
     cues: ['Stand with feet together and bend your knees slightly.', 'Rest your hands on your knees.', 'Slowly circle your knees together.', 'Switch directions halfway through.'],
-    anim: { dur: 0.6, hold: 0, frames: [
+    anim: { arrow: 'kneeR', dur: 0.6, hold: 0, frames: [
       { t: 65, aL: [196, 200], aR: [196, 200], lL: [134, 212], lR: [134, 212] },
       { t: 65, aL: [194, 202], aR: [194, 202], lL: [140, 220], lR: [140, 220] },
       { t: 65, aL: [198, 198], aR: [198, 198], lL: [146, 216], lR: [146, 216] },
@@ -251,7 +251,7 @@ export const MORE = [
     id: 'shoulder-rolls', name: 'Shoulder Rolls', type: 'stretch', mode: 'time', duration: 30, halfway: 'Switch directions.',
     primary: ['traps', 'shoulders'], secondary: ['upperBack'],
     cues: ['Sit tall with arms relaxed.', 'Lift your shoulders up toward your ears.', 'Roll them back and down in a smooth circle.', 'Switch directions halfway through.'],
-    anim: { view: 'front', props: CHAIR, dur: 0.6, hold: 0, frames: [
+    anim: { arrow: 'shoulderR', view: 'front', props: CHAIR, dur: 0.6, hold: 0, frames: [
       { ...CHAIR_F, sy: 0 },
       { ...CHAIR_F, sy: 2.4 },
       { ...CHAIR_F, sy: 1.2 },
@@ -271,7 +271,7 @@ export const MORE = [
     id: 'levator-scapulae', name: 'Levator Scapulae Stretch', type: 'stretch', mode: 'time', duration: 30, sided: true,
     primary: ['neck', 'traps'], secondary: [],
     cues: ['Sit tall and hold the side of your seat with one hand.', 'Turn your nose toward the opposite armpit.', 'Place the other hand on the back of your head and gently pull down.', 'Feel the stretch at the back of your neck, toward the shoulder blade.'],
-    anim: { view: 'front', props: CHAIR, dur: 2.6, frames: [
+    anim: { arrow: 'head', view: 'front', props: CHAIR, dur: 2.6, frames: [
       { ...CHAIR_F, h: -16, turn: -0.4, aL: [322, 74], aR: [176, 184] },
       { ...CHAIR_F, h: -30, turn: -0.7, aL: [316, 70], aR: [176, 184] },
     ] },
@@ -298,7 +298,7 @@ export const MORE = [
     id: 'neck-tilts', name: 'Side-to-Side Tilts', type: 'stretch', mode: 'time', duration: 30,
     primary: ['neck', 'traps'], secondary: [],
     cues: ['Sit tall with your shoulders relaxed.', 'Tilt one ear toward your shoulder.', 'Return to center and tilt to the other side.', 'Keep your shoulders down.'],
-    anim: { view: 'front', props: CHAIR, dur: 1.6, frames: [
+    anim: { arrow: 'head', view: 'front', props: CHAIR, dur: 1.6, frames: [
       { ...CHAIR_F, h: -26 },
       { ...CHAIR_F, h: 26 },
     ] },

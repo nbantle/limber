@@ -228,11 +228,84 @@ function drawChair(svg, { x, y, front }) {
   }
 }
 
+// ───────────── Motion arrows ─────────────
+// Curved arrows beside the body showing which way the main moving part travels.
+// Picked automatically from the animation; anim.arrow names a joint to override, or false to hide.
+const ARROW_JOINTS = ['hip', 'head', 'handL', 'handR', 'kneeL', 'kneeR', 'ankleL', 'ankleR', 'elbowL', 'elbowR', 'shoulderR'];
+const PAIR = { handL: 'handR', handR: 'handL', kneeL: 'kneeR', kneeR: 'kneeL', ankleL: 'ankleR', ankleR: 'ankleL', elbowL: 'elbowR', elbowR: 'elbowL' };
+const P2 = (p) => `${p[0].toFixed(2)} ${p[1].toFixed(2)}`;
+
+function arrowHead(tip, from, size = 2.1) {
+  const dx = tip[0] - from[0], dy = tip[1] - from[1];
+  const l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l;
+  const b = [tip[0] - ux * size * 1.25, tip[1] - uy * size * 1.25];
+  return `M${P2(tip)}L${P2([b[0] - uy * size * 0.75, b[1] + ux * size * 0.75])}L${P2([b[0] + uy * size * 0.75, b[1] - ux * size * 0.75])}Z`;
+}
+
+function motionArrows(rig, anim, exercise) {
+  if (anim.arrow === false || anim.frames.length < 2) return [];
+  const F = anim.frames.map((_, i) => rig.atFrame(i));
+  const body = [(F[0].hip[0] + F[0].neck[0]) / 2, (F[0].hip[1] + F[0].neck[1]) / 2];
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const out = [];
+  const circular = /direction/i.test(exercise.halfway ?? '') && anim.frames.length >= 4;
+  // Joint with the largest movement (arms count a little less so whole-body moves win).
+  const travel = (k) => (circular ? Math.max(...F.map((J) => dist(J[k], F[0][k]))) : dist(F[0][k], F[1][k])) * (/hand|elbow/.test(k) ? 0.75 : 1);
+  const joint = anim.arrow ?? ARROW_JOINTS.reduce((best, k) => (travel(k) > travel(best) ? k : best), 'hip');
+  const raw = circular ? Math.max(...F.map((J) => dist(J[joint], F[0][joint]))) : dist(F[0][joint], F[1][joint]);
+  if (raw < (anim.arrow ? 1 : 2.5)) return [];
+  const joints = [joint];
+  if (PAIR[joint] && rig.view === 'front' && !anim.arrow) {
+    const other = PAIR[joint];
+    if (dist(F[0][other], F[1][other]) > raw * 0.7) joints.push(other);
+  }
+  for (const k of joints) {
+    if (circular) {
+      const pts = F.map((J) => J[k]);
+      const c = [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
+      const r = Math.max(3.4, Math.max(...pts.map((p) => dist(p, c))) + 2.6);
+      // Spin direction from the order of the frames.
+      let turn = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length];
+        turn += (a[0] - c[0]) * (b[1] - c[1]) - (a[1] - c[1]) * (b[0] - c[0]);
+      }
+      const dir = turn >= 0 ? 1 : -1, a0 = -Math.PI * 0.9, sweep = Math.PI * 1.55 * dir;
+      const at = (t) => [c[0] + Math.cos(a0 + sweep * t) * r, c[1] + Math.sin(a0 + sweep * t) * r];
+      const s = at(0), e = at(1);
+      out.push({ d: `M${P2(s)}A${r.toFixed(2)} ${r.toFixed(2)} 0 1 ${dir > 0 ? 1 : 0} ${P2(e)}`, head: arrowHead(e, at(0.94)), ext: [c[0] - r - 2, c[1] - r - 2, c[0] + r + 2, c[1] + r + 2] });
+      continue;
+    }
+    let a = F[0][k], b = F[1][k];
+    let len = dist(a, b);
+    const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len;
+    if (len < 8) {
+      // Small movements still get a readable arrow, centered on the actual motion.
+      const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      a = [m[0] - ux * 4, m[1] - uy * 4]; b = [m[0] + ux * 4, m[1] + uy * 4]; len = 8;
+    }
+    // Offset sideways, away from the middle of the body.
+    let nx = -uy, ny = ux;
+    const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    if ((mid[0] - body[0]) * nx + (mid[1] - body[1]) * ny < 0) { nx = -nx; ny = -ny; }
+    const off = 4.2 + len * 0.08, bow = len * 0.22;
+    const trim = Math.min(1.6, len * 0.12);
+    const s = [a[0] + ux * trim + nx * off, a[1] + uy * trim + ny * off];
+    const e = [b[0] - ux * trim + nx * off, b[1] - uy * trim + ny * off];
+    const c = [mid[0] + nx * (off + bow), mid[1] + ny * (off + bow)];
+    const xs = [s[0], e[0], c[0]], ys = [s[1], e[1], c[1]];
+    out.push({ d: `M${P2(s)}Q${P2(c)} ${P2(e)}`, head: arrowHead(e, c), ext: [Math.min(...xs) - 2, Math.min(...ys) - 2, Math.max(...xs) + 2, Math.max(...ys) + 2] });
+  }
+  return out;
+}
+
 // Renders an exercise figure into `container`. Returns a controller.
-export function renderFigure(container, exercise, { animate = true, aspect = 1.3, frame = null, highlight = true } = {}) {
+export function renderFigure(container, exercise, { animate = true, aspect = 1.3, frame = null, highlight = true, arrows: arrowsOn = true } = {}) {
   const anim = exercise.anim;
   const rig = makeRig(anim);
-  const [vx, vy, vw, vh] = fitBox(rig.bbox, aspect);
+  const arrows = arrowsOn ? motionArrows(rig, anim, exercise) : [];
+  const box = arrows.reduce((b, a) => [Math.min(b[0], a.ext[0]), Math.min(b[1], a.ext[1]), Math.max(b[2], a.ext[2]), Math.max(b[3], a.ext[3])], rig.bbox);
+  const [vx, vy, vw, vh] = fitBox(box, aspect);
   const svg = el('svg', { viewBox: `${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}`, class: 'figure', role: 'img', 'aria-label': exercise.name });
   const hl = new Set(highlight ? exercise.primary ?? [] : []);
   const [bx0, by0, bx1, by1] = rig.bbox;
@@ -263,6 +336,11 @@ export function renderFigure(container, exercise, { animate = true, aspect = 1.3
     }
     ops.forEach((o, i) => { for (const k in o) if (k !== 'tag') nodes[i].setAttribute(k, o[k]); });
   };
+
+  if (arrows.length) {
+    const ag = el('g', { class: 'fig-arrows' }, svg);
+    for (const a of arrows) { el('path', { d: a.d, class: 'fig-arrow' }, ag); el('path', { d: a.head, class: 'fig-arrow-head' }, ag); }
+  }
 
   container.replaceChildren(svg);
   let raf = 0, start = performance.now(), running = false;

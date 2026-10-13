@@ -311,6 +311,8 @@ svg.figure { width: 100%; height: 100%; display: block; }
 .fig-box { fill: #d6dfe8; }
 .fig-mat { fill: #cde8f6; }
 .fig-shadow { fill: rgba(30, 40, 60, .1); }
+.fig-arrow { fill: none; stroke: #5bbcec; stroke-width: 1.5; stroke-linecap: round; opacity: .9; }
+.fig-arrow-head { fill: #5bbcec; opacity: .9; }
 .fig-chair line { stroke: #a9b6c3; stroke-width: 1.6; stroke-linecap: round; }
 .fig-chair rect { fill: #b9c5d1; }
 .fig-chair rect.back { fill: #d2dbe4; }

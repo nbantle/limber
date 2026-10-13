@@ -39,7 +39,7 @@ export const EXERCISES = [
     id: 'neck-side', name: 'Neck Side Stretch', type: 'stretch', mode: 'time', duration: 20, sided: true,
     primary: ['neck'], secondary: ['traps'],
     cues: ['Sit or stand tall with shoulders relaxed and down.', 'Tilt your ear toward your shoulder — don\'t lift the shoulder to meet it.', 'Rest your hand on your head for gentle extra pressure only.', 'Breathe slowly; feel the stretch along the opposite side of the neck.'],
-    anim: { view: 'front', dur: 2.4, frames: [
+    anim: { arrow: 'head', view: 'front', dur: 2.4, frames: [
       { ...STAND_F, h: -16, aL: [322, 74] },
       { ...STAND_F, h: -30, aL: [318, 70] },
     ] },
@@ -93,7 +93,7 @@ export const EXERCISES = [
     id: 'low-lunge', name: 'Low Lunge Hip Flexor Stretch', type: 'stretch', mode: 'time', duration: 30, sided: true,
     primary: ['hipFlexors', 'quads'], secondary: ['glutes'],
     cues: ['Kneel on one knee with the other foot in front, knee over ankle.', 'Tuck your tailbone and gently shift your hips forward.', 'Keep your chest tall and hands on your front knee.', 'Feel the stretch at the front of the back hip.'],
-    anim: { hotSegs: ['thL'], dur: 2.6, frames: [
+    anim: { arrow: 'hip', hotSegs: ['thL'], dur: 2.6, frames: [
       { t: 0, aL: [160, 145], aR: [158, 142], lR: [95, 175], lL: [200, 270, 270] },
       { t: -5, aL: [164, 140], aR: [162, 138], lR: [98, 195], lL: [204, 268, 270] },
     ] },
@@ -111,7 +111,7 @@ export const EXERCISES = [
     id: 'butterfly', name: 'Butterfly Stretch', type: 'stretch', mode: 'time', duration: 30,
     primary: ['adductors'], secondary: ['hipFlexors', 'glutes'],
     cues: ['Sit with the soles of your feet together, knees out to the sides.', 'Hold your feet and sit up tall.', 'Let your knees relax toward the floor — don\'t push them down.', 'For more stretch, hinge forward with a long back.'],
-    anim: { view: 'front', anchor: 'hip', dur: 2.6, frames: [
+    anim: { arrow: 'kneeL', view: 'front', anchor: 'hip', dur: 2.6, frames: [
       { t: 0, aL: [178, 172], aR: [182, 188], lL: [252, 108], lR: [108, 252] },
       { t: 0, aL: [178, 172], aR: [182, 188], lL: [262, 100], lR: [98, 260] },
     ] },
@@ -156,7 +156,7 @@ export const EXERCISES = [
     id: 'calf-stretch', name: 'Wall Calf Stretch', type: 'stretch', mode: 'time', duration: 30, sided: true,
     primary: ['calves'], secondary: ['hamstrings'],
     cues: ['Face a wall with hands on it at chest height.', 'Step one foot back, keeping that leg straight and heel down.', 'Bend the front knee and lean toward the wall.', 'Point the back toes straight forward.'],
-    anim: { plant: ['handL', 'handR'], props: [{ type: 'wall', at: 'handR', dx: 2 }], dur: 2.4, frames: [
+    anim: { arrow: 'hip', plant: ['handL', 'handR'], props: [{ type: 'wall', at: 'handR', dx: 2 }], dur: 2.4, frames: [
       { t: 18, aL: [72, 82], aR: [72, 82], lL: [160, 190], lR: [202, 202, 90] },
       { t: 24, aL: [76, 84], aR: [76, 84], lL: [154, 194], lR: [206, 206, 94] },
     ] },
@@ -259,7 +259,7 @@ export const EXERCISES = [
     id: 'glute-bridge', name: 'Glute Bridge', type: 'strength', mode: 'reps', reps: 15,
     primary: ['glutes', 'hamstrings'], secondary: ['lowerBack', 'abs'],
     cues: ['Lie on your back with knees bent and feet flat, hip-width apart.', 'Press through your heels and lift your hips.', 'Squeeze your glutes at the top — make a straight line from shoulders to knees.', 'Lower with control.'],
-    anim: { dur: 1, frames: [
+    anim: { arrow: 'hip', dur: 1, frames: [
       { t: 270, h: 270, aL: [90, 90], aR: [90, 90], ...SUPINE_KNEES },
       { t: 246, h: 268, aL: [100, 95], aR: [100, 95], lL: [75, 170], lR: [75, 170] },
     ] },
@@ -352,7 +352,7 @@ export const EXERCISES = [
     id: 'pull-up', name: 'Pull-Up', type: 'strength', mode: 'reps', reps: 5, equipment: 'Pull-up bar',
     primary: ['lats', 'biceps'], secondary: ['upperBack', 'forearms', 'shoulders'],
     cues: ['Hang from a bar with hands slightly wider than shoulders.', 'Pull your shoulder blades down and back first.', 'Pull until your chin passes the bar.', 'Lower all the way down with control.'],
-    anim: { view: 'front', hang: true, anchor: 'handR', plant: ['handL', 'handR'], props: [{ type: 'bar', at: 'handR', dx: -9.5, w: 44 }], dur: 1, frames: [
+    anim: { arrow: 'head', view: 'front', hang: true, anchor: 'handR', plant: ['handL', 'handR'], props: [{ type: 'bar', at: 'handR', dx: -9.5, w: 44 }], dur: 1, frames: [
       { t: 0, aL: [340, 352], aR: [20, 8], lL: [182, 180], lR: [178, 180] },
       { t: 0, aL: [240, 10], aR: [120, 350], lL: [176, 186], lR: [184, 174] },
     ] },
