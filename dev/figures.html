@@ -2,16 +2,15 @@
 <style>
 body{font:12px -apple-system;background:#111;color:#ddd;margin:8px}
 .grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
-.cell{background:#1c1f26;border-radius:8px;padding:4px}
+.cell{background:#f1f5f9;color:#333;border-radius:8px;padding:4px}
 .cell svg{width:100%;display:block}
-.fig-seg{stroke-linecap:round;fill:none}
-.fig-seg.near{stroke:#e8eaf0}.fig-seg.far{stroke:#7d8494}.fig-seg.hot{stroke:#ff8a4c}.fig-seg.far.hot{stroke:#a65a33}
-.fig-head{fill:#e8eaf0}.fig-ground{stroke:#444;stroke-width:.8}.fig-prop{stroke:#666;stroke-width:2}.fig-bar{stroke:#aaa;stroke-width:2;stroke-linecap:round}.fig-box{fill:#333}
+.fig-ground{stroke:#b6daee;stroke-width:1.1}.fig-wall{stroke:#8fcdec;stroke-width:1.3;stroke-dasharray:3 2.2}.fig-bar{stroke:#8a94a6;stroke-width:2.4;stroke-linecap:round}.fig-box{fill:#d6dfe8}
 </style>
 <label><input type=checkbox id=st> static frames</label>
 <div class=grid id=g></div>
 <script type=module>
-import {EXERCISES} from '../js/exercises.js'; import {renderFigure} from '../js/figure.js';
+import {EXERCISES} from '../js/exercises.js'; import {renderFigure} from '../js/figure.js'; import {setLook} from '../js/character.js';
+const qp=new URLSearchParams(location.search); setLook(qp.get('coach')||'a', +(qp.get('skin')??1));
 const g=document.getElementById('g');
 const draw=()=>{g.innerHTML='';const st=document.getElementById('st').checked;
 for(const ex of EXERCISES){ if(st){ ex.anim.frames.forEach((_,i)=>{const c=document.createElement('div');c.className='cell';c.innerHTML=`<div>${ex.id} f${i}</div><div class=f></div>`;g.append(c);renderFigure(c.querySelector('.f'),ex,{frame:i});}); }

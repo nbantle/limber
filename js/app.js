@@ -1,12 +1,13 @@
 import { EXERCISES, STARTER_ROUTINES, MUSCLES } from './exercises.js';
 import { renderFigure } from './figure.js';
+import { COACHES, SKINS, setLook } from './character.js';
 import { muscleMapSVG } from './muscles.js';
 import { audio, wakeLock } from './audio.js';
 
 // ───────────────────────── Storage ─────────────────────────
 
 const KEY = 'limber.v1';
-const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5 };
+const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5, coach: 'a', skin: 1 };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -26,6 +27,7 @@ function normalize() {
   db.custom ??= [];
   db.history ??= [];
   db.settings = { ...DEFAULT_SETTINGS, ...db.settings };
+  setLook(db.settings.coach, db.settings.skin);
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { toast('Could not save — storage is full or blocked'); }
@@ -672,11 +674,23 @@ function viewHistory() {
 
 // ───────────────────────── Settings ─────────────────────────
 
+let settingsFig = null;
+
 function viewSettings() {
   const S = db.settings;
   const tog = (k, label, sub) => `<label class="switch-row"><span>${label}${sub ? `<small>${sub}</small>` : ''}</span><button class="toggle ${S[k] ? 'on' : ''}" data-tog="${k}" role="switch" aria-checked="${!!S[k]}"><span></span></button></label>`;
   app.innerHTML = `
     <header class="top"><h1>Settings</h1></header>
+    <section class="card settings">
+      <h3>Your coach</h3>
+      <div class="coach-row">
+        <div class="coach-preview"></div>
+        <div class="coach-pick">
+          <div class="seg">${Object.entries(COACHES).map(([k, c]) => `<button data-coach="${k}" class="${S.coach === k ? 'on' : ''}">${c.label}</button>`).join('')}</div>
+          <div class="swatches" role="group" aria-label="Skin tone">${SKINS.map((c, i) => `<button class="swatch ${S.skin === i ? 'on' : ''}" data-skin="${i}" style="background:${c}" aria-label="Skin tone ${i + 1}"></button>`).join('')}</div>
+        </div>
+      </div>
+    </section>
     <section class="card settings">
       <h3>During a routine</h3>
       ${tog('voice', 'Voice guidance', 'Announces each exercise and side')}
@@ -693,9 +707,17 @@ function viewSettings() {
       <button class="btn ghost wide" data-act="starters">Add starter routines</button>
     </section>
     <p class="muted center small">Limber · stretch &amp; calisthenics guide<br>Listen to your body — stop if anything hurts.</p>`;
+  settingsFig?.stop();
+  settingsFig = renderFigure($('.coach-preview', app), BUILTIN.get('side-bend'), { aspect: 0.9 });
   app.onclick = (e) => {
-    const t = e.target.closest('[data-tog],[data-act]');
+    const t = e.target.closest('[data-tog],[data-act],[data-coach],[data-skin]');
     if (!t) return;
+    if (t.dataset.coach || t.dataset.skin) {
+      if (t.dataset.coach) S.coach = t.dataset.coach;
+      if (t.dataset.skin) S.skin = +t.dataset.skin;
+      setLook(S.coach, S.skin); save(); viewSettings();
+      return;
+    }
     if (t.dataset.tog) { S[t.dataset.tog] = !S[t.dataset.tog]; save(); viewSettings(); return; }
     if (t.dataset.act === 'step') {
       const f = t.dataset.f;
@@ -727,6 +749,7 @@ function viewSettings() {
       } catch { toast('That file is not a Limber backup'); }
     }
   };
+  return () => settingsFig?.stop();
 }
 
 // ───────────────────────── Player ─────────────────────────

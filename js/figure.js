@@ -1,4 +1,6 @@
-// Animated mannequin renderer.
+import { paint } from './character.js';
+
+// Animated figure renderer.
 //
 // Poses use absolute segment angles in degrees: 0 = up, 90 = forward (screen right),
 // 180 = down, 270 (or -90) = backward. Side-view figures face right; "R" limbs are the
@@ -6,19 +8,10 @@
 //
 // pose = { t: torso, h: head, aL/aR: [upperArm, forearm], lL/lR: [thigh, shin, foot?], lift }
 
-const LEN = { torso: 24, shoulderAt: 21, neck: 2.5, headR: 4.8, ua: 12.5, fa: 12, th: 18, sh: 18, foot: 6, footFront: 3.2 };
-const WID = { torso: 9.5, neck: 4, ua: 4.8, fa: 4, th: 6.6, sh: 5.2, foot: 3.4 };
+const LEN = { torso: 24, shoulderAt: 21, neck: 2.5, headR: 5, ua: 12.5, fa: 12, th: 18, sh: 18, foot: 6, footFront: 3.2 };
+const WID = { torso: 10, neck: 3.6, ua: 4.7, fa: 3.6, th: 7.4, sh: 5.1, foot: 3.9 };
 const SVGNS = 'http://www.w3.org/2000/svg';
 
-const SEG_MUSCLES = {
-  torso: ['chest', 'abs', 'obliques', 'lats', 'upperBack', 'lowerBack'],
-  neck: ['neck', 'traps'],
-  ua: ['shoulders', 'biceps', 'triceps'],
-  fa: ['forearms'],
-  th: ['quads', 'hamstrings', 'glutes', 'hipFlexors', 'adductors'],
-  sh: ['calves'],
-  foot: [],
-};
 
 const rad = (a) => (a * Math.PI) / 180;
 const dir = (a) => [Math.sin(rad(a)), -Math.cos(rad(a))];
@@ -221,39 +214,19 @@ export function renderFigure(container, exercise, { animate = true, aspect = 1.3
   const hl = new Set(highlight ? exercise.primary ?? [] : []);
   if (!rig.hang) el('line', { x1: vx, x2: vx + vw, y1: 0.2, y2: 0.2, class: 'fig-ground' }, svg);
   for (const pr of rig.props) {
-    if (pr.type === 'wall') el('line', { x1: pr.x, x2: pr.x, y1: 0, y2: vy, class: 'fig-prop' }, svg);
+    if (pr.type === 'wall') el('line', { x1: pr.x, x2: pr.x, y1: 0, y2: vy, class: 'fig-wall' }, svg);
     if (pr.type === 'bar') el('line', { x1: pr.x - pr.w / 2, x2: pr.x + pr.w / 2, y1: pr.y, y2: pr.y, class: 'fig-bar' }, svg);
     if (pr.type === 'box') el('rect', { x: pr.x - pr.w / 2, y: pr.y, width: pr.w, height: -pr.y, rx: 1.2, class: 'fig-box' }, svg);
   }
   const g = el('g', {}, svg);
-  const J0 = rig.atFrame(0);
-  const segs = segments(J0, rig.view);
-  const lines = segs.map((s) => {
-    const hot = SEG_MUSCLES[s.kind].some((m) => hl.has(m));
-    const cls = ['fig-seg', s.far ? 'far' : 'near', hot ? 'hot' : ''].join(' ');
-    return el(s.kind === 'torso' ? 'path' : 'line', { 'stroke-width': s.w, class: cls }, g);
-  });
-  const head = el('circle', { r: LEN.headR, class: 'fig-head' + (hl.has('neck') ? ' hot' : '') }, g);
-  // Head goes before the near arm in side view so arms can pass in front of the face.
-  g.insertBefore(head, lines[segs.findIndex((s) => s.name === 'neck') + 1] ?? null);
-
+  let nodes = [];
   const draw = (J) => {
-    const ss = segments(J, rig.view);
-    ss.forEach((s, i) => {
-      const ln = lines[i];
-      if (s.kind === 'torso') {
-        // Curved spine: bulge toward the back (positive c) or belly (negative c).
-        const [ax, ay] = s.a, [bx, by] = s.b;
-        const len = Math.hypot(bx - ax, by - ay) || 1;
-        const nx = (by - ay) / len, ny = -(bx - ax) / len;
-        const cx = (ax + bx) / 2 + nx * s.c * 1.6, cy = (ay + by) / 2 + ny * s.c * 1.6;
-        ln.setAttribute('d', `M${ax.toFixed(2)} ${ay.toFixed(2)}Q${cx.toFixed(2)} ${cy.toFixed(2)} ${bx.toFixed(2)} ${by.toFixed(2)}`);
-        return;
-      }
-      ln.setAttribute('x1', s.a[0].toFixed(2)); ln.setAttribute('y1', s.a[1].toFixed(2));
-      ln.setAttribute('x2', s.b[0].toFixed(2)); ln.setAttribute('y2', s.b[1].toFixed(2));
-    });
-    head.setAttribute('cx', J.head[0].toFixed(2)); head.setAttribute('cy', J.head[1].toFixed(2));
+    const ops = paint(J, rig.view, hl, anim.hotSegs);
+    if (ops.length !== nodes.length || ops.some((o, i) => nodes[i].tagName !== o.tag)) {
+      g.replaceChildren();
+      nodes = ops.map((o) => el(o.tag, {}, g));
+    }
+    ops.forEach((o, i) => { for (const k in o) if (k !== 'tag') nodes[i].setAttribute(k, o[k]); });
   };
 
   container.replaceChildren(svg);

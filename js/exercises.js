@@ -44,7 +44,7 @@ export const EXERCISES = [
     id: 'cross-body-shoulder', name: 'Cross-Body Shoulder Stretch', type: 'stretch', mode: 'time', duration: 30, sided: true,
     primary: ['shoulders'], secondary: ['upperBack', 'triceps'],
     cues: ['Bring one straight arm across your chest at shoulder height.', 'Hook the other forearm above the elbow and draw it closer.', 'Keep the shoulder down, away from your ear.', 'Feel the stretch in the back of the shoulder.'],
-    anim: { view: 'front', dur: 2.4, frames: [
+    anim: { view: 'front', hotSegs: ['uaR'], dur: 2.4, frames: [
       { ...STAND_F, aR: [272, 270], aL: [152, -14] },
       { ...STAND_F, aR: [266, 268], aL: [148, -20] },
     ] },
@@ -53,7 +53,7 @@ export const EXERCISES = [
     id: 'overhead-triceps', name: 'Overhead Triceps Stretch', type: 'stretch', mode: 'time', duration: 30, sided: true,
     primary: ['triceps'], secondary: ['lats', 'shoulders'],
     cues: ['Reach one arm overhead, then bend the elbow so your hand drops behind your head.', 'Use the other hand to gently press the elbow back and in.', 'Keep your ribs down — avoid arching your lower back.', 'Hold and breathe.'],
-    anim: { view: 'front', dur: 2.4, frames: [
+    anim: { view: 'front', hotSegs: ['uaR'], dur: 2.4, frames: [
       { ...STAND_F, aR: [352, 205], aL: [358, 88] },
       { ...STAND_F, aR: [344, 198], aL: [352, 86] },
     ] },
@@ -89,7 +89,7 @@ export const EXERCISES = [
     id: 'low-lunge', name: 'Low Lunge Hip Flexor Stretch', type: 'stretch', mode: 'time', duration: 30, sided: true,
     primary: ['hipFlexors', 'quads'], secondary: ['glutes'],
     cues: ['Kneel on one knee with the other foot in front, knee over ankle.', 'Tuck your tailbone and gently shift your hips forward.', 'Keep your chest tall and hands on your front knee.', 'Feel the stretch at the front of the back hip.'],
-    anim: { dur: 2.6, frames: [
+    anim: { hotSegs: ['thL'], dur: 2.6, frames: [
       { t: 0, aL: [160, 145], aR: [158, 142], lR: [95, 175], lL: [200, 270, 270] },
       { t: -5, aL: [164, 140], aR: [162, 138], lR: [98, 195], lL: [204, 268, 270] },
     ] },
