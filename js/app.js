@@ -287,7 +287,17 @@ function render() {
   }
   location.hash = '#/';
 }
-window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => {
+  if (updateWaiting && !location.hash.startsWith('#/play')) { reloadIntoUpdate(); return; }
+  render(); window.scrollTo(0, 0);
+});
+
+// A new version of the app is ready (see the service worker setup at the bottom).
+let updateWaiting = false;
+function reloadIntoUpdate() {
+  try { sessionStorage.setItem('limber.updated', '1'); } catch { /* ignore */ }
+  location.reload();
+}
 
 function updateTabs(tab) {
   $$('.tabbar a').forEach((a) => a.classList.toggle('active', a.dataset.tab === tab));
@@ -1741,7 +1751,18 @@ function viewPlayer(id) {
 // ───────────────────────── Boot ─────────────────────────
 
 render();
+try { if (sessionStorage.getItem('limber.updated')) { sessionStorage.removeItem('limber.updated'); toast('Updated to the latest version'); } } catch { /* ignore */ }
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  // The installed app resumes from memory instead of reloading, so check for a new version whenever it
+  // comes back to the foreground; when one takes over, reload into it (never in the middle of a workout).
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  }).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) return; // first install, nothing old on screen
+    if (location.hash.startsWith('#/play')) { updateWaiting = true; return; }
+    reloadIntoUpdate();
+  });
 }
