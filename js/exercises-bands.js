@@ -115,8 +115,8 @@ export const BANDS = [
     primary: ['glutes', 'hamstrings'], secondary: ['lowerBack'],
     cues: ['Lie on your back with a loop band above your knees, feet flat.', 'Press your knees out gently against the band.', 'Drive through your heels to lift your hips.', 'Squeeze at the top, then lower with control.'],
     anim: { gear: { kind: 'band', to: 'knees' }, arrow: 'hip', dur: 1, frames: [
-      { t: 270, h: 270, aL: [90, 90], aR: [90, 90], lL: [45, 150], lR: [45, 150] },
-      { t: 246, h: 268, aL: [100, 95], aR: [100, 95], lL: [75, 170], lR: [75, 170] },
+      { t: 270, h: 270, aL: [97, 99], aR: [97, 99], lL: [45, 150], lR: [45, 150] },
+      { t: 246, h: 268, aL: [104, 100], aR: [104, 100], lL: [75, 170], lR: [75, 170] },
     ] },
   },
 ];

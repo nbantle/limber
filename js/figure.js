@@ -14,7 +14,8 @@ import { C, mix } from './palette.js';
 // A leg's foot angle defaults to flat (side view) or turned out (front view). In side view a relaxed
 // foot sits at shin − 90; pointed toes approach the shin angle. Anything past the shin angle is backwards.
 // anim.top draws a lying figure seen from above (front view rules, no floor).
-// anim.legsFront (front view) draws the legs over the torso, for seated poses with the knees toward the viewer.
+// anim.legsFront (front view) draws the legs over the torso, for seated poses with the knees toward the viewer;
+//   'cross' (cross-legged) also puts the shins in front of the thighs.
 // anim.steady keeps the anchor fixed between frames (e.g. hands on the floor while the legs swing).
 // anim.gear draws equipment in the hands: { kind: 'db' | 'kb' | 'bb', hands: 'LR' | 'R' | 'both', axis, at }.
 //   axis (dumbbells/barbells): 'end' = handle points at the viewer (drawn as a plate), 'perp' = across the
@@ -296,7 +297,7 @@ export function makeRig(anim) {
       dy = -Math.max(...pts.map((p) => p[1] + p[2])) - (pose.lift ?? 0);
     }
     for (const k in J) if (Array.isArray(J[k])) J[k] = [J[k][0] + dx, J[k][1] + dy];
-    if (anim.legsFront) J.legsFront = true;
+    if (anim.legsFront) J.legsFront = anim.legsFront;
     if (ref) {
       for (const p of plant) {
         const s = p.slice(-1);

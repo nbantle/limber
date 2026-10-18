@@ -4,7 +4,7 @@ const STAND = { t: 0, aL: [178, 178], aR: [182, 182] };
 const STAND_F = { t: 0, aL: [192, 186], aR: [168, 174], lL: [183, 180], lR: [177, 180] };
 const HIPS_F = { aL: [215, 135], aR: [145, 225] }; // hands on hips, front view
 const CHAIR_F = { t: 0, kth: 0.32, lL: [184, 180], lR: [176, 180], aL: [186, 170], aR: [174, 190] };
-const CROSS_F = { t: 0, lL: [258, 100], lR: [102, 260] }; // seated cross-legged, front view
+const CROSS_F = { t: 0, lL: [282, 104, 90], lR: [78, 256, 270], kth: 0.85, ksh: 1.3 }; // seated cross-legged, front view (use with legsFront)
 const SUPINE_T = { t: 270, aL: [180, 180], aR: [0, 0], lL: [90, 90], lR: [90, 90] }; // lying, seen from above
 const CHAIR = [{ type: 'chair', at: 'hip' }];
 
@@ -52,8 +52,8 @@ export const MORE = [
     primary: ['chest', 'shoulders'], secondary: ['biceps'],
     cues: ['Sit with knees bent and feet flat.', 'Place your hands on the floor behind you, fingers pointing back.', 'Lean back and lift your chest toward the ceiling.', 'Keep your shoulders down away from your ears.'],
     anim: { plant: ['handL', 'handR'], anchor: 'hip', dur: 2.6, frames: [
-      { t: -10, aL: [202, 192], aR: [202, 192], lL: [50, 155], lR: [50, 155] },
-      { t: -24, h: -20, aL: [222, 212], aR: [222, 212], lL: [50, 155], lR: [50, 155] },
+      { t: -10, aL: [196, 188], aR: [196, 188], lL: [46, 150], lR: [46, 150] },
+      { t: -24, h: -20, aL: [222, 212], aR: [222, 212], lL: [46, 150], lR: [46, 150] },
     ] },
   },
   {
@@ -69,7 +69,7 @@ export const MORE = [
     id: 'seated-side-bend', name: 'Seated Side Bend', type: 'stretch', mode: 'time', duration: 20, sided: true,
     primary: ['obliques', 'lats'], secondary: ['shoulders'],
     cues: ['Sit cross-legged and tall.', 'Place one hand on the floor beside you.', 'Reach the other arm up and over your head.', 'Lengthen through your side — keep both hips grounded.'],
-    anim: { view: 'front', dur: 2.6, frames: [
+    anim: { view: 'front', legsFront: 'cross', plant: ['handL'], dur: 2.6, frames: [
       { ...CROSS_F, t: -4, pv: 0, aR: [4, 0], aL: [200, 196] },
       { ...CROSS_F, t: -22, pv: 0, h: -26, aR: [334, 304], aL: [212, 204] },
     ] },
@@ -78,9 +78,9 @@ export const MORE = [
     id: 'seated-twist', name: 'Seated Spinal Twist', type: 'stretch', mode: 'time', duration: 30, sided: true,
     primary: ['obliques', 'lowerBack'], secondary: ['upperBack'],
     cues: ['Sit cross-legged and tall.', 'Place one hand on the opposite knee and the other hand behind you.', 'Inhale to lengthen, exhale to twist and look over your shoulder.', 'Twist from your ribs, not just your neck.'],
-    anim: { view: 'front', dur: 2.6, frames: [
-      { ...CROSS_F, turn: -0.3, aR: [212, 236], aL: [204, 196] },
-      { ...CROSS_F, turn: -0.95, h: -6, aR: [222, 240], aL: [208, 200] },
+    anim: { view: 'front', legsFront: 'cross', dur: 2.6, frames: [
+      { ...CROSS_F, turn: -0.3, aR: [212, 236], aL: [200, 190] },
+      { ...CROSS_F, turn: -0.95, h: -6, aR: [222, 240], aL: [203, 194] },
     ] },
   },
   {
@@ -311,8 +311,8 @@ export const MORE = [
     primary: ['abs'], secondary: ['hipFlexors'],
     cues: ['Lie on your back, knees bent at 90° above your hips.', 'Press your arms into the floor.', 'Curl your hips off the floor, drawing your knees toward your chest.', 'Lower slowly with control.'],
     anim: { anchor: 'shoulderR', dur: 1, frames: [
-      { t: 270, aL: [90, 90], aR: [90, 90], lL: [0, 90, 0], lR: [0, 90, 0] },
-      { t: 258, aL: [92, 90], aR: [92, 90], lL: [328, 62, 0], lR: [328, 62, 0] },
+      { t: 270, aL: [97, 99], aR: [97, 99], lL: [0, 90, 0], lR: [0, 90, 0] },
+      { t: 258, aL: [105, 101], aR: [105, 101], lL: [328, 62, 0], lR: [328, 62, 0] },
     ] },
   },
   {

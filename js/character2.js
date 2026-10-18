@@ -218,12 +218,16 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       hand(s, isFar);
     } else {
       const legCol = who.mono ? skin : fem ? who.bottom : skin;
-      push(part(f2, p2, 0, 1, { scale: sc }), far(legCol, isFar));
-      push(part(f1, p1, 0, 1, { scale: sc }), far(legCol, isFar));
-      if (!who.mono && !fem) {
-        push(part(f1, p1, -0.05, 0.55, { grow: 0.55, capB: false, scale: sc }), far(who.bottom, isFar));
-        push(part(f2, p2, 0.8, 0.95, { grow: 0.12, capA: false, capB: false, scale: sc }), far(C.white, isFar));
-      }
+      const thigh = () => {
+        push(part(f1, p1, 0, 1, { scale: sc }), far(legCol, isFar));
+        if (!who.mono && !fem) push(part(f1, p1, -0.05, 0.55, { grow: 0.55, capB: false, scale: sc }), far(who.bottom, isFar));
+      };
+      const shin = () => {
+        push(part(f2, p2, 0, 1, { scale: sc }), far(legCol, isFar));
+        if (!who.mono && !fem) push(part(f2, p2, 0.8, 0.95, { grow: 0.12, capA: false, capB: false, scale: sc }), far(C.white, isFar));
+      };
+      // Cross-legged front poses: the shins cross in front of the thighs.
+      if (J.legsFront === 'cross' && !side) { thigh(); shin(); } else { shin(); thigh(); }
       shoe(s, isFar);
     }
   };

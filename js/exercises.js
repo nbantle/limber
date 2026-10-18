@@ -96,8 +96,8 @@ export const EXERCISES = [
     primary: ['hipFlexors', 'quads'], secondary: ['glutes'],
     cues: ['Kneel on one knee with the other foot in front, knee over ankle.', 'Tuck your tailbone and gently shift your hips forward.', 'Keep your chest tall and hands on your front knee.', 'Feel the stretch at the front of the back hip.'],
     anim: { arrow: 'hip', hotSegs: ['thL'], dur: 2.6, frames: [
-      { t: 0, aL: [160, 145], aR: [158, 142], lR: [95, 175], lL: [200, 270, 270] },
-      { t: -5, aL: [164, 140], aR: [162, 138], lR: [98, 195], lL: [204, 268, 270] },
+      { t: 0, aL: [160, 145], aR: [158, 142], lR: [93, 168], lL: [188, 272, 270] },
+      { t: -5, aL: [164, 140], aR: [162, 138], lR: [96, 188], lL: [188, 270, 270] },
     ] },
   },
   {
@@ -151,8 +151,8 @@ export const EXERCISES = [
     primary: ['abs', 'hipFlexors'], secondary: ['chest', 'lowerBack'],
     cues: ['Lie face down with hands under your shoulders.', 'Press gently to lift your chest, keeping hips on the floor.', 'Keep elbows soft and shoulders away from your ears.', 'Only lift as high as feels comfortable for your lower back.'],
     anim: { plant: ['handL', 'handR'], anchor: 'hip', dur: 2.6, frames: [
-      { t: 84, h: 88, aL: [290, 155], aR: [290, 155], lL: [270, 270, 270], lR: [270, 270, 270] },
-      { t: 58, h: 30, c: -4, aL: [200, 160], aR: [200, 160], lL: [270, 270, 270], lR: [270, 270, 270] },
+      { t: 84, h: 88, aL: [293, 150], aR: [293, 150], lL: [266, 268, 262], lR: [266, 268, 262] },
+      { t: 58, h: 30, c: -4, aL: [200, 160], aR: [200, 160], lL: [266, 268, 262], lR: [266, 268, 262] },
     ] },
   },
   {
@@ -178,8 +178,8 @@ export const EXERCISES = [
     primary: ['glutes', 'hipFlexors'], secondary: ['lowerBack'],
     cues: ['From hands and knees, bring one knee forward behind your wrist.', 'Extend the other leg straight back along the floor.', 'Square your hips and stay upright, or fold forward over the front leg.', 'Use a cushion under the front hip if it doesn\'t reach the floor.'],
     anim: { anchor: 'hip', dur: 3, frames: [
-      { t: 8, aL: [170, 176], aR: [168, 174], ksh: [1, 0.45], lR: [94, 262, 262], lL: [268, 270, 270] },
-      { t: 72, h: 92, c: 3, aL: [96, 92], aR: [96, 92], ksh: [1, 0.45], lR: [94, 262, 262], lL: [268, 270, 270] },
+      { t: 8, aL: [170, 176], aR: [168, 174], ksh: [1, 0.45], lR: [94, 262, 262], lL: [264, 272, 275] },
+      { t: 72, h: 92, c: 3, aL: [96, 92], aR: [96, 92], ksh: [1, 0.45], lR: [94, 262, 262], lL: [264, 272, 275] },
     ] },
   },
   {
@@ -236,8 +236,8 @@ export const EXERCISES = [
     primary: ['chest', 'triceps'], secondary: ['shoulders', 'abs'],
     cues: ['Start on hands and knees, then walk your hands forward.', 'Keep a straight line from your head to your knees.', 'Lower your chest toward the floor with control.', 'Press back up — a great way to build toward full push-ups.'],
     anim: { anchor: 'kneeR', plant: ['handL', 'handR'], dur: 0.9, frames: [
-      { t: 51, aL: [180, 180], aR: [180, 180], lL: [231, 276, 250], lR: [231, 276, 250] },
-      { t: 75, aL: [265, 150], aR: [265, 150], lL: [255, 276, 250], lR: [255, 276, 250] },
+      { t: 56, aL: [180, 180], aR: [180, 180], lL: [231, 273, 250], lR: [231, 273, 250] },
+      { t: 75, aL: [265, 150], aR: [265, 150], lL: [255, 273, 250], lR: [255, 273, 250] },
     ] },
   },
   {
@@ -245,7 +245,7 @@ export const EXERCISES = [
     primary: ['shoulders'], secondary: ['triceps', 'upperBack'],
     cues: ['Start in an upside-down V with hips high.', 'Bend your elbows to lower the top of your head toward the floor.', 'Keep your hips high throughout.', 'Press back up to the start.'],
     anim: { anchor: 'toeR', plant: ['handL', 'handR'], dur: 0.9, frames: [
-      { t: 135, h: 145, aL: [135, 135], aR: [135, 135], lL: [205, 205, 120], lR: [205, 205, 120] },
+      { t: 135, h: 145, aL: [146, 146], aR: [146, 146], lL: [205, 205, 120], lR: [205, 205, 120] },
       { t: 156, h: 168, aL: [300, 150], aR: [300, 150], lL: [210, 210, 120], lR: [210, 210, 120] },
     ] },
   },
@@ -272,8 +272,8 @@ export const EXERCISES = [
     primary: ['glutes', 'hamstrings'], secondary: ['lowerBack', 'abs'],
     cues: ['Lie on your back with knees bent and feet flat, hip-width apart.', 'Press through your heels and lift your hips.', 'Squeeze your glutes at the top — make a straight line from shoulders to knees.', 'Lower with control.'],
     anim: { arrow: 'hip', dur: 1, frames: [
-      { t: 270, h: 270, aL: [90, 90], aR: [90, 90], ...SUPINE_KNEES },
-      { t: 246, h: 268, aL: [100, 95], aR: [100, 95], lL: [75, 170], lR: [75, 170] },
+      { t: 270, h: 270, aL: [97, 99], aR: [97, 99], ...SUPINE_KNEES },
+      { t: 246, h: 268, aL: [104, 100], aR: [104, 100], lL: [75, 170], lR: [75, 170] },
     ] },
   },
   {
@@ -281,7 +281,7 @@ export const EXERCISES = [
     primary: ['abs'], secondary: ['shoulders', 'lowerBack', 'glutes'],
     cues: ['Forearms on the floor, elbows under shoulders.', 'Make a straight line from head to heels.', 'Brace your belly and squeeze your glutes.', 'Don\'t let your hips sag or pike up. Keep breathing.'],
     anim: { anchor: 'toeR', dur: 2, frames: [
-      { t: 85, h: 88, aL: [180, 90], aR: [180, 90], lL: [264, 264, 175], lR: [264, 264, 175] },
+      { t: 85, h: 88, aL: [180, 90], aR: [180, 90], lL: [263, 263, 175], lR: [263, 263, 175] },
       { t: 84, h: 87, aL: [181, 90], aR: [181, 90], lL: [263, 263, 175], lR: [263, 263, 175] },
     ] },
   },
@@ -340,8 +340,8 @@ export const EXERCISES = [
     primary: ['abs', 'hipFlexors'], secondary: [],
     cues: ['Lie on your back with legs straight and arms by your sides.', 'Press your lower back into the floor.', 'Raise your legs together until they point at the ceiling.', 'Lower slowly — stop before your back arches.'],
     anim: { anchor: 'hip', dur: 1.1, frames: [
-      { t: 270, aL: [90, 90], aR: [90, 90], lL: [88, 88, 0], lR: [88, 88, 0] },
-      { t: 270, aL: [90, 90], aR: [90, 90], lL: [4, 4, 300], lR: [4, 4, 300] },
+      { t: 270, aL: [97, 99], aR: [97, 99], lL: [88, 88, 0], lR: [88, 88, 0] },
+      { t: 270, aL: [97, 99], aR: [97, 99], lL: [4, 4, 300], lR: [4, 4, 300] },
     ] },
   },
   {
