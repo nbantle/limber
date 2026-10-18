@@ -8,10 +8,19 @@ import { paint } from './character2.js';
 //
 // pose = { t: torso, h: head, aL/aR: [upperArm, forearm], lL/lR: [thigh, shin, foot?], lift,
 //          c: spine curve, sy: shoulder lift, turn: head turn (-1..1, front view),
-//          kth/kfa: thigh/forearm length factor for limbs pointing at the viewer (number or [L, R]) }
+//          kth/ksh/kua/kfa: thigh/shin/upper-arm/forearm length factor for limbs pointing at the viewer (number or [L, R]),
+//          pv: pelvis angle in front view (defaults to t; 0 keeps the hips level while the torso bends) }
+// A leg's foot angle defaults to flat (side view) or turned out (front view). In side view a relaxed
+// foot sits at shin − 90; pointed toes approach the shin angle. Anything past the shin angle is backwards.
 // anim.top draws a lying figure seen from above (front view rules, no floor).
+// anim.steady keeps the anchor fixed between frames (e.g. hands on the floor while the legs swing).
+// anim.gear draws equipment in the hands: { kind: 'db' | 'kb' | 'bb', hands: 'LR' | 'R' | 'both', axis, at }.
+//   axis (dumbbells/barbells): 'end' = handle points at the viewer (drawn as a plate), 'perp' = across the
+//   forearm, 'along' = in line with the forearm, 'level' = horizontal, 'upright' = vertical. hands 'both' = one item held in both hands.
+//   at: 'back' rests a barbell across the upper back instead of in the hands.
 
 const LEN = { torso: 24, shoulderAt: 21, neck: 2.5, headR: 5, ua: 12.5, fa: 12, th: 18, sh: 18, foot: 6, footFront: 3.2 };
+export const GLUTE = { r: 4.2, off: 1.4 }; // side-view seat: circle tucked behind the hip, between torso and thighs
 const WID = { torso: 10, neck: 3.6, ua: 4.7, fa: 3.6, th: 7.4, sh: 5.1, foot: 3.9 };
 const SVGNS = 'http://www.w3.org/2000/svg';
 
@@ -34,22 +43,34 @@ function solve(pose, view) {
   J.head = add(J.neck, h, LEN.neck + LEN.headR);
   const sh = add(J.hip, t, LEN.shoulderAt + (pose.sy ?? 0));
   const p = front ? dir(t + 90) : [0, 0];
+  const pp = front ? dir((pose.pv ?? t) + 90) : [0, 0];
   J.shoulderL = [sh[0] - p[0] * 7, sh[1] - p[1] * 7];
   J.shoulderR = [sh[0] + p[0] * 7, sh[1] + p[1] * 7];
-  J.hipL = [-p[0] * 4.2, -p[1] * 4.2];
-  J.hipR = [p[0] * 4.2, p[1] * 4.2];
+  J.hipL = [-pp[0] * 4.2, -pp[1] * 4.2];
+  J.hipR = [pp[0] * 4.2, pp[1] * 4.2];
   for (const s of ['L', 'R']) {
     const [u, f] = pose['a' + s] ?? [180, 180];
-    J['elbow' + s] = add(J['shoulder' + s], u, LEN.ua);
+    J['elbow' + s] = add(J['shoulder' + s], u, LEN.ua * side(pose.kua, s));
     J['hand' + s] = add(J['elbow' + s], f, LEN.fa * side(pose.kfa, s));
     const [th, shn, ft] = pose['l' + s] ?? [180, 180];
     J['knee' + s] = add(J['hip' + s], th, LEN.th * side(pose.kth, s));
-    J['ankle' + s] = add(J['knee' + s], shn, LEN.sh);
-    J['footAngle' + s] = ft ?? (front ? (s === 'L' ? shn + 90 : shn - 90) : 90);
+    J['ankle' + s] = add(J['knee' + s], shn, LEN.sh * side(pose.ksh, s));
+    J['footAngle' + s] = ft ?? defaultFoot(shn, s, front);
     J['toe' + s] = add(J['ankle' + s], J['footAngle' + s], front ? LEN.footFront : LEN.foot);
+  }
+  if (!front) {
+    // Glutes sit behind the hip, pointing away from where the torso and thighs go.
+    const thL = (pose.lL ?? [180])[0], thR = (pose.lR ?? [180])[0];
+    const mix = (a, b, c) => [0, 1].map((i) => dir(a)[i] + (dir(b)[i] + dir(c)[i]) / 2);
+    const bk = mix(t - 90, thL + 90, thR + 90), fw = mix(t, thL, thR);
+    const v = [bk[0] - 0.6 * fw[0], bk[1] - 0.6 * fw[1]];
+    const l = Math.hypot(v[0], v[1]) || 1;
+    J.glute = [v[0] / l * GLUTE.off, v[1] / l * GLUTE.off];
   }
   return J;
 }
+
+const defaultFoot = (shn, s, front) => (front ? (s === 'L' ? shn + 90 : shn - 90) : 90);
 
 function segments(J, view) {
   const S = (name, a, b, kind, far) => ({ name, a: J[a], b: J[b], kind, far, w: WID[kind] });
@@ -64,8 +85,80 @@ function segments(J, view) {
   return [...L.arm, ...L.leg, ...core, ...R.leg, ...R.arm];
 }
 
+// ───────────── Equipment ─────────────
+const GEAR = { plate: '#2f3542', hub: '#5d6676', bar: '#9aa3b2', far: '#7d8595' };
+const unit = (v) => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
+const grip = (J, s) => { const F = unit([J['hand' + s][0] - J['elbow' + s][0], J['hand' + s][1] - J['elbow' + s][1]]); return { p: [J['hand' + s][0] + F[0], J['hand' + s][1] + F[1]], F }; };
+const f2 = (n) => n.toFixed(2);
+
+// Returns { far, near } paint ops and contact circles [x, y, r] for the equipment in this pose.
+function gearParts(J, gear, view) {
+  const out = { far: [], near: [], pts: [] };
+  if (!gear) return out;
+  const side = view === 'side';
+  const circle = (list, c, r, fill) => { list.push({ tag: 'circle', cx: f2(c[0]), cy: f2(c[1]), r: f2(r), fill }); out.pts.push([c[0], c[1], r]); };
+  const bar = (list, a, b, w, stroke) => list.push({ tag: 'path', d: `M${f2(a[0])} ${f2(a[1])}L${f2(b[0])} ${f2(b[1])}`, stroke, 'stroke-width': w, 'stroke-linecap': 'round', fill: 'none' });
+  const plate = (list, c, A, along, across, fill) => {
+    const N = [-A[1], A[0]], ang = (Math.atan2(A[1], A[0]) * 180) / Math.PI;
+    list.push({ tag: 'rect', x: f2(c[0] - along / 2), y: f2(c[1] - across / 2), width: f2(along), height: f2(across), rx: 0.8, transform: `rotate(${f2(ang)} ${f2(c[0])} ${f2(c[1])})`, fill });
+    out.pts.push([c[0], c[1], Math.max(Math.abs(N[1]) * across, Math.abs(A[1]) * along) / 2]);
+  };
+  const axisOf = (F) => {
+    const a = gear.axis ?? (side ? 'end' : 'perp');
+    return a === 'perp' ? [-F[1], F[0]] : a === 'along' ? F : a === 'level' ? [1, 0] : a === 'upright' ? [0, -1] : null;
+  };
+  const dumbbell = (list, c, A, far) => {
+    const col = far ? GEAR.far : GEAR.plate;
+    if (!A) { circle(list, c, 2.6, col); list.push({ tag: 'circle', cx: f2(c[0]), cy: f2(c[1]), r: 1, fill: GEAR.hub }); return; }
+    bar(list, [c[0] - A[0] * 3.2, c[1] - A[1] * 3.2], [c[0] + A[0] * 3.2, c[1] + A[1] * 3.2], 1.2, GEAR.bar);
+    for (const k of [-1, 1]) plate(list, [c[0] + A[0] * 3.9 * k, c[1] + A[1] * 3.9 * k], A, 2.2, 5.2, col);
+  };
+  const kettlebell = (list, c, D, far) => {
+    list.push({ tag: 'circle', cx: f2(c[0] + D[0] * 1.3), cy: f2(c[1] + D[1] * 1.3), r: 1.9, fill: 'none', stroke: GEAR.hub, 'stroke-width': 1.1 });
+    circle(list, [c[0] + D[0] * 4.4, c[1] + D[1] * 4.4], 3.3, far ? GEAR.far : GEAR.plate);
+  };
+  const hands = gear.hands ?? 'LR';
+  if (gear.kind === 'bb') {
+    let c, A;
+    if (gear.at === 'back') {
+      const T = unit([J.neck[0] - J.hip[0], J.neck[1] - J.hip[1]]);
+      c = [J.neck[0] - T[0] * 2 + T[1] * 4.2, J.neck[1] - T[1] * 2 - T[0] * 4.2]; // behind the neck (side view faces right)
+    } else c = side ? grip(J, 'R').p : [(grip(J, 'L').p[0] + grip(J, 'R').p[0]) / 2, (grip(J, 'L').p[1] + grip(J, 'R').p[1]) / 2];
+    if (side) {
+      circle(out.near, c, 7.4, GEAR.plate);
+      out.near.push({ tag: 'circle', cx: f2(c[0]), cy: f2(c[1]), r: 5.6, fill: 'none', stroke: '#3c4352', 'stroke-width': 0.6 });
+      out.near.push({ tag: 'circle', cx: f2(c[0]), cy: f2(c[1]), r: 1.6, fill: GEAR.hub });
+      out.near.push({ tag: 'circle', cx: f2(c[0]), cy: f2(c[1]), r: 0.8, fill: GEAR.bar });
+    } else {
+      const gl = grip(J, 'L').p, gr = grip(J, 'R').p;
+      A = unit([gr[0] - gl[0], gr[1] - gl[1]]);
+      const half = Math.hypot(gr[0] - gl[0], gr[1] - gl[1]) / 2 + 13;
+      bar(out.far, [c[0] - A[0] * half, c[1] - A[1] * half], [c[0] + A[0] * half, c[1] + A[1] * half], 1.3, GEAR.bar);
+      for (const k of [-1, 1]) {
+        plate(out.near, [c[0] + A[0] * (half - 4.5) * k, c[1] + A[1] * (half - 4.5) * k], A, 2.8, 14, GEAR.plate);
+        plate(out.near, [c[0] + A[0] * (half - 7.6) * k, c[1] + A[1] * (half - 7.6) * k], A, 2.2, 10, GEAR.plate);
+      }
+    }
+    return out;
+  }
+  const draw = gear.kind === 'kb' ? kettlebell : dumbbell;
+  if (hands === 'both') {
+    const a = grip(J, 'L'), b = grip(J, 'R');
+    const c = [(a.p[0] + b.p[0]) / 2, (a.p[1] + b.p[1]) / 2];
+    const F = unit([a.F[0] + b.F[0], a.F[1] + b.F[1]]);
+    draw(out.near, c, gear.kind === 'kb' ? F : axisOf(F), false);
+    return out;
+  }
+  for (const s of hands === 'R' ? ['R'] : ['L', 'R']) {
+    const g = grip(J, s), far = side && s === 'L';
+    draw(far ? out.far : out.near, g.p, gear.kind === 'kb' ? g.F : axisOf(g.F), far);
+  }
+  return out;
+}
+
 function contactPoints(J, exclude) {
   const pts = [[J.head[0], J.head[1], LEN.headR], [J.hip[0], J.hip[1], WID.torso / 2], [J.neck[0], J.neck[1], WID.torso / 2]];
+  if (J.glute) pts.push([J.glute[0], J.glute[1], GLUTE.r]);
   for (const s of ['L', 'R']) {
     if (!exclude.has('hand' + s)) pts.push([...J['elbow' + s], WID.ua / 2], [...J['hand' + s], WID.fa / 2]);
     pts.push([...J['shoulder' + s], WID.ua / 2]);
@@ -75,23 +168,33 @@ function contactPoints(J, exclude) {
   return pts;
 }
 
-function interp(a, b, u) {
+const ANGLES = new Set(['t', 'h', 'pv', 'aL', 'aR', 'lL', 'lR']);
+
+function interp(a, b, u, front) {
   const out = {};
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  const def = { t: 0, c: 0, lift: 0, sy: 0, turn: 0, kth: 1, kfa: 1, aL: [180, 180], aR: [180, 180], lL: [180, 180], lR: [180, 180] };
+  const def = { t: 0, c: 0, lift: 0, sy: 0, turn: 0, kth: 1, ksh: 1, kua: 1, kfa: 1, aL: [180, 180], aR: [180, 180], lL: [180, 180], lR: [180, 180] };
+  // Angles turn the short way round (a raised arm lowers in front, it doesn't swing through the body).
+  const lerp = (k, x, y) => {
+    if (!ANGLES.has(k)) return x + (y - x) * u;
+    return x + ((((y - x) % 360) + 540) % 360 - 180) * u;
+  };
+  // A leg that names its foot angle in only one frame gets the other frame's default foot, not a copy.
+  const leg = (v, k) => (v.length > 2 ? v : [...v, defaultFoot(v[1], k.slice(-1), front)]);
   for (const k of keys) {
-    let va = a[k] ?? (k === 'h' ? a.t ?? 0 : def[k]);
-    let vb = b[k] ?? (k === 'h' ? b.t ?? 0 : def[k]);
+    let va = a[k] ?? (k === 'h' || k === 'pv' ? a.t ?? 0 : def[k]);
+    let vb = b[k] ?? (k === 'h' || k === 'pv' ? b.t ?? 0 : def[k]);
     if (Array.isArray(va) || Array.isArray(vb)) {
       va = va ?? []; vb = vb ?? [];
+      if ((k === 'lL' || k === 'lR') && va.length !== vb.length) { va = leg(va, k); vb = leg(vb, k); }
       const n = Math.max(va.length, vb.length);
       out[k] = [];
       for (let i = 0; i < n; i++) {
         const x = va[i], y = vb[i];
         if (x === undefined && y === undefined) continue;
-        out[k][i] = x === undefined ? y : y === undefined ? x : x + (y - x) * u;
+        out[k][i] = x === undefined ? y : y === undefined ? x : lerp(k, x, y);
       }
-    } else out[k] = va + (vb - va) * u;
+    } else out[k] = lerp(k, va, vb);
   }
   return out;
 }
@@ -136,17 +239,18 @@ export function makeRig(anim) {
     const u = (tt - i * dur) / dur;
     const hold = anim.hold ?? 0.25;
     const uu = u < hold / 2 ? 0 : u > 1 - hold / 2 ? 1 : (u - hold / 2) / (1 - hold);
-    return interp(frames[i], frames[(i + 1) % frames.length], ease(uu));
+    return interp(frames[i], frames[(i + 1) % frames.length], ease(uu), view === 'front');
   };
 
   const place = (pose, ref) => {
     const J = solve(pose, view);
     let dx = 0, dy = 0;
     if (ref) dx = ref.anchor[0] - J[anchor][0];
-    if (anim.hang || anim.top) {
+    // steady: after the first frame, hold the anchor still instead of re-seating the body on the floor.
+    if (anim.hang || anim.top || (anim.steady && ref)) {
       if (ref) dy = ref.anchor[1] - J[anchor][1];
     } else {
-      const pts = contactPoints(J, plant);
+      const pts = [...contactPoints(J, plant), ...gearParts(J, anim.gear, view).pts];
       dy = -Math.max(...pts.map((p) => p[1] + p[2])) - (pose.lift ?? 0);
     }
     for (const k in J) if (Array.isArray(J[k])) J[k] = [J[k][0] + dx, J[k][1] + dy];
@@ -170,7 +274,8 @@ export function makeRig(anim) {
     if (pr.type === 'wall') return { type: 'wall', x: j[0] + (pr.dx ?? 0) };
     if (pr.type === 'bar') return { type: 'bar', x: j[0] + (pr.dx ?? 0), y: j[1] - 1.5, w: pr.w ?? 34 };
     if (pr.type === 'box') return { type: 'box', x: j[0] + (pr.dx ?? 0), y: j[1] + (pr.dy ?? 2), w: pr.w ?? 16 };
-    if (pr.type === 'chair') return { type: 'chair', x: j[0] + (pr.dx ?? 0), y: j[1] + 4.6, front: view === 'front' };
+    if (pr.type === 'bench') return { type: 'bench', x: j[0] + (pr.dx ?? 0), y: j[1] + (pr.dy ?? 2), w: pr.w ?? 30 };
+    if (pr.type === 'chair') return { type: 'chair', x: j[0] + (pr.dx ?? 0), y: J0.glute ? J0.glute[1] + GLUTE.r - 0.4 : j[1] + 4.6, front: view === 'front' };
     return null;
   }).filter(Boolean);
 
@@ -182,12 +287,13 @@ export function makeRig(anim) {
     const J = at((i / N) * cycle);
     for (const s of segments(J, view)) { grow(...s.a, s.w / 2); grow(...s.b, s.w / 2); }
     grow(...J.head, LEN.headR);
+    for (const [x, y, r] of gearParts(J, anim.gear, view).pts) grow(x, y, r);
   }
   if (!anim.hang && !anim.top) grow(x0, 0);
   for (const pr of props) {
     if (pr.type === 'wall') grow(pr.x, y0), grow(pr.x, 0);
     if (pr.type === 'bar') grow(pr.x - pr.w / 2, pr.y - 2), grow(pr.x + pr.w / 2, pr.y);
-    if (pr.type === 'box') grow(pr.x - pr.w / 2, pr.y), grow(pr.x + pr.w / 2, 0);
+    if (pr.type === 'box' || pr.type === 'bench') grow(pr.x - pr.w / 2, pr.y), grow(pr.x + pr.w / 2, 0);
     if (pr.type === 'chair') grow(pr.x - 10, pr.y - 24), grow(pr.x + 10, 0);
   }
   // Floor exercises get a yoga mat.
@@ -226,6 +332,14 @@ function drawChair(svg, { x, y, front }) {
     el('line', { x1: x + 6, x2: x + 6, y1: y, y2: 0 }, g);
     el('rect', { x: x - 8, y, width: 15, height: 2.6, rx: 1.2 }, g);
   }
+}
+
+// Flat weight bench: padded top on two legs.
+function drawBench(svg, { x, y, w }) {
+  const g = el('g', { class: 'fig-chair' }, svg);
+  for (const dx of [-w / 2 + 3, w / 2 - 3]) el('line', { x1: x + dx, x2: x + dx, y1: y + 2, y2: 0 }, g);
+  el('line', { x1: x - w / 2 + 1, x2: x + w / 2 - 1, y1: 0.2, y2: 0.2 }, g);
+  el('rect', { x: x - w / 2, y, width: w, height: 3, rx: 1.4, class: 'pad' }, g);
 }
 
 // ───────────── Motion arrows ─────────────
@@ -300,7 +414,7 @@ function motionArrows(rig, anim, exercise) {
 }
 
 // Renders an exercise figure into `container`. Returns a controller.
-export function renderFigure(container, exercise, { animate = true, aspect = 1.3, frame = null, highlight = true, arrows: arrowsOn = true } = {}) {
+export function renderFigure(container, exercise, { animate = true, aspect = 1.3, frame = null, time = null, highlight = true, arrows: arrowsOn = true } = {}) {
   const anim = exercise.anim;
   const rig = makeRig(anim);
   const arrows = arrowsOn ? motionArrows(rig, anim, exercise) : [];
@@ -319,6 +433,7 @@ export function renderFigure(container, exercise, { animate = true, aspect = 1.3
     if (pr.type === 'bar') el('line', { x1: pr.x - pr.w / 2, x2: pr.x + pr.w / 2, y1: pr.y, y2: pr.y, class: 'fig-bar' }, svg);
     if (pr.type === 'box') el('rect', { x: pr.x - pr.w / 2, y: pr.y, width: pr.w, height: -pr.y, rx: 1.2, class: 'fig-box' }, svg);
     if (pr.type === 'chair') drawChair(svg, pr);
+    if (pr.type === 'bench') drawBench(svg, pr);
   }
   const shadow = rig.hang || rig.top ? null : el('ellipse', { cy: 0.4, ry: 1.3, class: 'fig-shadow' }, svg);
   const g = el('g', {}, svg);
@@ -329,7 +444,8 @@ export function renderFigure(container, exercise, { animate = true, aspect = 1.3
       shadow.setAttribute('cx', ((Math.min(...xs) + Math.max(...xs)) / 2).toFixed(2));
       shadow.setAttribute('rx', Math.max(6, (Math.max(...xs) - Math.min(...xs)) / 2 + 5).toFixed(2));
     }
-    const ops = paint(J, rig.view, hl, anim.hotSegs);
+    const gear = gearParts(J, anim.gear, rig.view);
+    const ops = [...gear.far, ...paint(J, rig.view, hl, anim.hotSegs, !rig.hang && !rig.top), ...gear.near];
     if (ops.length !== nodes.length || ops.some((o, i) => nodes[i].tagName !== o.tag)) {
       g.replaceChildren();
       nodes = ops.map((o) => el(o.tag, {}, g));
@@ -346,12 +462,13 @@ export function renderFigure(container, exercise, { animate = true, aspect = 1.3
   let raf = 0, start = performance.now(), running = false;
   const loop = (now) => { draw(rig.at((now - start) / 1000)); raf = requestAnimationFrame(loop); };
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  if (frame !== null || !animate || reduce) draw(rig.atFrame(frame ?? (anim.thumb ?? Math.min(1, anim.frames.length - 1))));
+  if (time !== null) draw(rig.at(time));
+  else if (frame !== null || !animate || reduce) draw(rig.atFrame(frame ?? (anim.thumb ?? Math.min(1, anim.frames.length - 1))));
   else { running = true; raf = requestAnimationFrame(loop); }
   return {
     svg,
     stop() { cancelAnimationFrame(raf); running = false; },
     pause() { if (running) { cancelAnimationFrame(raf); running = false; } },
-    resume() { if (!running && animate && !reduce && frame === null) { running = true; raf = requestAnimationFrame(loop); } },
+    resume() { if (!running && animate && !reduce && frame === null && time === null) { running = true; raf = requestAnimationFrame(loop); } },
   };
 }

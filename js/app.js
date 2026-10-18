@@ -7,7 +7,7 @@ import { audio, wakeLock } from './audio.js';
 // ───────────────────────── Storage ─────────────────────────
 
 const KEY = 'limber.v1';
-const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5, coach: 'a', skin: 1 };
+const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5, coach: 'a', skin: 1, units: 'lb' };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -53,7 +53,22 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const fmtTime = (s) => { s = Math.max(0, Math.round(s)); const m = Math.floor(s / 60); return m ? `${m}:${String(s % 60).padStart(2, '0')}` : `${s}s`; };
 const fmtClock = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const fmtMin = (s) => (s < 60 ? `${Math.max(1, Math.round(s))} sec` : `${Math.round(s / 60)} min`);
-const typeVar = (t) => (t === 'strength' ? 'var(--strength)' : 'var(--stretch)');
+// Exercise types. 'strength' is the stored id for calisthenics (kept so saved routines keep working).
+const TYPES = {
+  stretch: { label: 'Stretch', plural: 'Stretches', count: 'stretch', color: 'var(--stretch)' },
+  strength: { label: 'Calisthenics', plural: 'Calisthenics', count: 'calisthenics', color: 'var(--strength)' },
+  weights: { label: 'Free Weights', plural: 'Free Weights', count: 'free weight', color: 'var(--weights)' },
+};
+const typeVar = (t) => (TYPES[t] ?? TYPES.stretch).color;
+const typeLabel = (t) => (TYPES[t] ?? TYPES.stretch).label;
+const typeChips = (on) => ['all', ...Object.keys(TYPES)].map((f) => `<button class="chip ${f === on ? 'on' : ''}" data-f="${f}">${f === 'all' ? 'All' : TYPES[f].plural}</button>`).join('');
+
+// Weights are stored in the units chosen in Settings; built-in defaults are in pounds.
+const LB_PER_KG = 2.2046;
+const weightInc = () => (db.settings.units === 'kg' ? 1 : 2.5);
+const roundWeight = (w) => Math.round(w * 2) / 2;
+const defaultWeight = (ex) => (ex.weight ? (db.settings.units === 'kg' ? Math.round(ex.weight / LB_PER_KG) : ex.weight) : 0);
+const fmtWeight = (w) => `${+(+w).toFixed(1)} ${db.settings.units}`;
 const muscleNames = (list) => (list ?? []).map((m) => MUSCLES[m] ?? m).join(', ');
 
 const ICONS = {
@@ -79,6 +94,8 @@ const ICONS = {
   edit: '<path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
   body: '<circle cx="12" cy="4.5" r="2"/><path d="M5 9h14M12 9v6M9 21l3-6 3 6"/>',
+  grip: '<circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+  sort: '<path d="M7 4v16M3.5 7.5L7 4l3.5 3.5M17 20V4M13.5 16.5L17 20l3.5-3.5"/>',
 };
 const icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
 
@@ -129,8 +146,9 @@ function stepInfo(step) {
     ex, mode,
     duration: step.duration ?? ex.duration ?? 30,
     reps: step.reps ?? ex.reps ?? 10,
-    sets: step.sets ?? 1,
-    setRest: step.setRest ?? (ex.type === 'strength' ? 30 : 10),
+    sets: step.sets ?? ex.sets ?? 1,
+    setRest: step.setRest ?? (ex.type === 'weights' ? 60 : ex.type === 'strength' ? 30 : 10),
+    weight: ex.type === 'weights' ? step.weight ?? defaultWeight(ex) : null,
     sided: !!ex.sided && step.sides !== 'one',
   };
 }
@@ -147,7 +165,7 @@ function buildPhases(routine) {
     for (let set = 1; set <= si.sets; set++) {
       sides.forEach((side, k) => {
         if (k > 0 && S.switchTime > 0) P.push({ kind: 'switch', dur: S.switchTime, side });
-        P.push({ kind: 'work', ex: si.ex, mode: si.mode, dur: si.mode === 'time' ? si.duration : null, reps: si.reps, side, set, sets: si.sets, step: idx });
+        P.push({ kind: 'work', ex: si.ex, mode: si.mode, dur: si.mode === 'time' ? si.duration : null, reps: si.reps, weight: si.weight, side, set, sets: si.sets, step: idx });
       });
       if (set < si.sets && si.setRest > 0) P.push({ kind: 'rest', dur: si.setRest });
     }
@@ -166,6 +184,7 @@ function stepSummary(step) {
   if (!si) return 'Missing exercise';
   let s = si.mode === 'time' ? fmtTime(si.duration) : `${si.reps} reps`;
   if (si.sets > 1) s += ` × ${si.sets} sets`;
+  if (si.weight) s += ` · ${fmtWeight(si.weight)}`;
   if (si.sided) s += ' · each side';
   return s;
 }
@@ -218,21 +237,33 @@ const isStandalone = () => window.navigator.standalone || window.matchMedia?.('(
 function viewRoutines() {
   const hintDismissed = (() => { try { return localStorage.getItem('limber.hint') === '1'; } catch { return false; } })();
   const showHint = !isStandalone() && !hintDismissed && /iPhone|iPad|iPod/.test(navigator.userAgent);
-  app.innerHTML = `
-    <header class="top">
-      <h1>Routines</h1>
-      <button class="btn-icon accent" data-act="new" aria-label="New routine">${icon('plus')}</button>
-    </header>
-    ${showHint ? `<div class="hint"><div><strong>Install Limber</strong><p>Tap the Share button ${icon('share', 'inline')} then <b>Add to Home Screen</b> to use it like an app. Routines you make in the installed app stay there.</p></div><button class="btn-icon" data-act="hint" aria-label="Dismiss">${icon('close')}</button></div>` : ''}
-    <div class="cards">
-      ${db.routines.length ? db.routines.map(routineCard).join('') : `<div class="empty"><p>No routines yet.</p><button class="btn primary" data-act="new">Create a routine</button></div>`}
-    </div>
-    ${db.routines.length ? `<button class="btn ghost wide" data-act="new">${icon('plus')} New routine</button>` : ''}
-  `;
+  let sorting = false;
+  const draw = () => {
+    app.innerHTML = `
+      <header class="top">
+        <h1>Routines</h1>
+        <div class="top-actions">
+          ${db.routines.length > 1 ? (sorting
+            ? '<button class="btn small primary" data-act="sort">Done</button>'
+            : `<button class="btn-icon" data-act="sort" aria-label="Reorder routines">${icon('sort')}</button>`) : ''}
+          ${sorting ? '' : `<button class="btn-icon accent" data-act="new" aria-label="New routine">${icon('plus')}</button>`}
+        </div>
+      </header>
+      ${showHint && !sorting ? `<div class="hint"><div><strong>Install Limber</strong><p>Tap the Share button ${icon('share', 'inline')} then <b>Add to Home Screen</b> to use it like an app. Routines you make in the installed app stay there.</p></div><button class="btn-icon" data-act="hint" aria-label="Dismiss">${icon('close')}</button></div>` : ''}
+      ${sorting ? '<p class="muted small sort-tip">Drag the handles to reorder.</p>' : ''}
+      <div class="cards ${sorting ? 'sorting-mode' : ''}">
+        ${db.routines.length ? db.routines.map((r) => routineCard(r, sorting)).join('') : `<div class="empty"><p>No routines yet.</p><button class="btn primary" data-act="new">Create a routine</button></div>`}
+      </div>
+      ${db.routines.length && !sorting ? `<button class="btn ghost wide" data-act="new">${icon('plus')} New routine</button>` : ''}
+    `;
+    sortable($('.cards', app), '.rcard', (from, to) => { move(db.routines, from, to); save(); draw(); });
+  };
+  draw();
   app.onclick = (e) => {
     const t = e.target.closest('[data-act]');
     if (!t) return;
     const id = t.closest('[data-id]')?.dataset.id;
+    if (t.dataset.act === 'sort') { sorting = !sorting; draw(); }
     if (t.dataset.act === 'new') {
       const r = { id: uid(), name: 'New Routine', rest: 10, steps: [] };
       db.routines.unshift(r); save();
@@ -244,19 +275,80 @@ function viewRoutines() {
   };
 }
 
-function routineCard(r) {
+function routineCard(r, sorting = false) {
   const infos = r.steps.map(stepInfo).filter(Boolean);
-  const nStretch = infos.filter((i) => i.ex.type === 'stretch').length;
-  const nStrength = infos.length - nStretch;
+  const mix = Object.entries(TYPES).map(([k, t]) => [k, t, infos.filter((i) => (TYPES[i.ex.type] ? i.ex.type : 'stretch') === k).length])
+    .filter(([, , n]) => n).map(([k, t, n]) => `<span class="pill ${k}">${n} ${t.count}</span>`).join('');
   const last = db.history.find((h) => h.routineId === r.id);
   return `<article class="rcard" data-id="${r.id}">
-    <button class="rcard-main" data-act="open">
+    <button class="rcard-main" ${sorting ? 'tabindex="-1"' : 'data-act="open"'}>
       <h2>${esc(r.name)}</h2>
       <p class="meta">${infos.length} exercise${infos.length === 1 ? '' : 's'} · ~${fmtMin(estimate(r))}${last ? ` · last done ${relDate(last.date)}` : ''}</p>
-      <div class="mix">${nStretch ? `<span class="pill stretch">${nStretch} stretch</span>` : ''}${nStrength ? `<span class="pill strength">${nStrength} strength</span>` : ''}</div>
+      <div class="mix">${mix}</div>
     </button>
-    <button class="play-btn" data-act="play" aria-label="Start ${esc(r.name)}" ${infos.length ? '' : 'disabled'}>${icon('play')}</button>
+    ${sorting
+      ? `<span class="grip" aria-label="Drag to reorder ${esc(r.name)}">${icon('grip')}</span>`
+      : `<button class="play-btn" data-act="play" aria-label="Start ${esc(r.name)}" ${infos.length ? '' : 'disabled'}>${icon('play')}</button>`}
   </article>`;
+}
+
+const move = (arr, from, to) => arr.splice(to, 0, ...arr.splice(from, 1));
+
+// Drag-to-reorder for a list: press a .grip inside an item and drag. Calls onDrop(from, to).
+// Attach again whenever the list element is re-rendered.
+function sortable(list, itemSel, onDrop) {
+  list.addEventListener('pointerdown', (e) => {
+    const grip = e.target.closest('.grip');
+    const el = grip?.closest(itemSel);
+    if (!el || !list.contains(el) || e.button > 0) return;
+    const items = [...list.querySelectorAll(itemSel)];
+    const from = items.indexOf(el);
+    e.preventDefault();
+    grip.setPointerCapture?.(e.pointerId);
+    const rects = items.map((x) => x.getBoundingClientRect());
+    const gap = rects.length > 1 ? Math.max(0, rects[1].top - rects[0].bottom) : 8;
+    const shift = rects[from].height + gap;
+    const y0 = e.clientY, scroll0 = window.scrollY;
+    let y = y0, to = from, raf = 0;
+    el.classList.add('dragging');
+    list.classList.add('sorting');
+    const frame = () => {
+      // Scroll when dragging near the top or bottom edge.
+      const edge = 72;
+      if (y < edge) window.scrollBy(0, -Math.ceil((edge - y) / 6));
+      else if (y > innerHeight - edge - 70) window.scrollBy(0, Math.ceil((y - (innerHeight - edge - 70)) / 6));
+      const dy = y - y0 + (window.scrollY - scroll0);
+      el.style.transform = `translateY(${dy}px)`;
+      const mid = rects[from].top + rects[from].height / 2 + dy;
+      to = from;
+      rects.forEach((r, i) => {
+        const m = r.top + r.height / 2;
+        if (i < from && mid < m) to = Math.min(to, i);
+        if (i > from && mid > m) to = Math.max(to, i);
+      });
+      items.forEach((x, i) => {
+        if (x === el) return;
+        const s = from < to && i > from && i <= to ? -shift : to < from && i >= to && i < from ? shift : 0;
+        x.style.transform = s ? `translateY(${s}px)` : '';
+      });
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    const onMove = (ev) => { y = ev.clientY; };
+    const end = () => {
+      cancelAnimationFrame(raf);
+      grip.removeEventListener('pointermove', onMove);
+      grip.removeEventListener('pointerup', end);
+      grip.removeEventListener('pointercancel', end);
+      items.forEach((x) => { x.style.transform = ''; });
+      el.classList.remove('dragging');
+      list.classList.remove('sorting');
+      if (to !== from) onDrop(from, to);
+    };
+    grip.addEventListener('pointermove', onMove);
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
+  });
 }
 
 function relDate(iso) {
@@ -296,7 +388,7 @@ function viewEditor(id) {
         <label class="inline-stepper">Rest between ${stepper('rest', r.rest ?? 10, 5, 0, 300, 's')}</label>
       </div>
       <ol class="steps">
-        ${r.steps.map((s, i) => stepRow(s, i, r.steps.length, open === s.id)).join('')}
+        ${r.steps.map((s, i) => stepRow(s, i, r.steps.length, open === s.id, r.rest ?? 10)).join('')}
       </ol>
       ${r.steps.length ? '' : '<div class="empty small"><p>Add stretches and exercises to build your routine.</p></div>'}
       <button class="btn ghost wide" data-act="add">${icon('plus')} Add exercises</button>
@@ -307,7 +399,8 @@ function viewEditor(id) {
       if (ex) figs.push(renderFigure(el, ex, { animate: false, aspect: 1.15 }));
     });
     const openFig = $('.step-preview', app);
-    if (openFig) figs.push(renderFigure(openFig, getEx(openFig.dataset.ex), { aspect: 1.6 }));
+    if (openFig) figs.push(renderFigure(openFig, getEx(openFig.dataset.ex), { aspect: 1.25 }));
+    sortable($('.steps', app), '.step', (from, to) => { move(r.steps, from, to); commit(); });
   };
 
   const commit = (redraw = true) => { save(); if (redraw) draw(); };
@@ -320,8 +413,6 @@ function viewEditor(id) {
     const step = r.steps[idx];
     switch (t.dataset.act) {
       case 'toggle': open = open === sid ? null : sid; draw(); break;
-      case 'up': if (idx > 0) { [r.steps[idx - 1], r.steps[idx]] = [r.steps[idx], r.steps[idx - 1]]; commit(); } break;
-      case 'down': if (idx < r.steps.length - 1) { [r.steps[idx + 1], r.steps[idx]] = [r.steps[idx], r.steps[idx + 1]]; commit(); } break;
       case 'dup': r.steps.splice(idx + 1, 0, { ...clone(step), id: uid() }); commit(); break;
       case 'remove': r.steps.splice(idx, 1); if (open === sid) open = null; commit(); break;
       case 'mode': step.mode = t.dataset.v; commit(); break;
@@ -330,7 +421,7 @@ function viewEditor(id) {
         const f = t.dataset.f, target = f === 'rest' && !sid ? r : step;
         const [min, max, inc] = [+t.dataset.min, +t.dataset.max, +t.dataset.inc];
         const cur = target[f] ?? (f === 'rest' ? r.rest ?? 10 : stepInfo(step)[f]);
-        target[f] = Math.min(max, Math.max(min, cur + inc));
+        target[f] = roundWeight(Math.min(max, Math.max(min, cur + inc)));
         commit();
         break;
       }
@@ -350,7 +441,7 @@ function viewEditor(id) {
     if (t.dataset.num) {
       const sid = t.closest('[data-sid]')?.dataset.sid;
       const target = sid ? r.steps.find((s) => s.id === sid) : r;
-      const v = Math.round(+t.value);
+      const v = t.dataset.num === 'weight' ? roundWeight(+t.value) : Math.round(+t.value);
       if (t.value === '' && sid) delete target[t.dataset.num];
       else if (Number.isFinite(v)) target[t.dataset.num] = Math.min(+t.max, Math.max(+t.min, v));
       commit();
@@ -360,48 +451,56 @@ function viewEditor(id) {
   return () => figs.forEach((f) => f.stop());
 }
 
-function stepper(field, value, inc, min, max, unit = '') {
+function stepper(field, value, inc, min, max, unit = '', placeholder = '') {
   return `<span class="stepper">
     <button data-act="step" data-f="${field}" data-inc="${-inc}" data-min="${min}" data-max="${max}" aria-label="Decrease">−</button>
-    <input type="number" inputmode="numeric" data-num="${field}" value="${value}" min="${min}" max="${max}" aria-label="${field}"><span class="unit">${unit}</span>
+    <input type="number" inputmode="${inc % 1 ? 'decimal' : 'numeric'}" step="any" data-num="${field}" value="${value}" min="${min}" max="${max}" placeholder="${placeholder}" aria-label="${field}"><span class="unit">${unit}</span>
     <button data-act="step" data-f="${field}" data-inc="${inc}" data-min="${min}" data-max="${max}" aria-label="Increase">+</button>
   </span>`;
 }
 
-function stepRow(s, i, n, isOpen) {
+function stepRow(s, i, n, isOpen, routineRest) {
   const si = stepInfo(s);
+  const grip = `<span class="grip" aria-label="Drag to reorder">${icon('grip')}</span>`;
   if (!si) {
-    return `<li class="step" data-sid="${s.id}"><div class="step-head"><div class="step-name">Missing exercise</div><button class="btn-icon" data-act="remove">${icon('trash')}</button></div></li>`;
+    return `<li class="step" data-sid="${s.id}"><div class="step-row"><div class="step-head"><div class="step-name">Missing exercise</div><button class="btn-icon" data-act="remove">${icon('trash')}</button></div>${grip}</div></li>`;
   }
   const ex = si.ex;
+  const tile = (label, control) => `<label class="tile"><span class="tile-l">${label}</span>${control}</label>`;
+  const per = si.sided ? ' <small>/side</small>' : '';
   return `<li class="step ${isOpen ? 'open' : ''}" data-sid="${s.id}" style="--acc:${typeVar(ex.type)}">
-    <button class="step-head" data-act="toggle" aria-expanded="${isOpen}">
-      <span class="step-num">${i + 1}</span>
-      <span class="step-thumb" data-ex="${ex.id}"></span>
-      <span class="step-text"><span class="step-name">${esc(ex.name)}</span><span class="step-sum">${stepSummary(s)}</span></span>
-      ${icon(isOpen ? 'up' : 'down', 'chev')}
-    </button>
+    <div class="step-row">
+      <button class="step-head" data-act="toggle" aria-expanded="${isOpen}">
+        <span class="step-num">${i + 1}</span>
+        <span class="step-thumb" data-ex="${ex.id}"></span>
+        <span class="step-text"><span class="step-name">${esc(ex.name)}</span><span class="step-sum">${stepSummary(s)}</span></span>
+      </button>
+      ${grip}
+    </div>
     ${isOpen ? `<div class="step-body">
-      <div class="step-preview" data-ex="${ex.id}"></div>
-      <div class="seg" role="group" aria-label="Measure by">
-        <button data-act="mode" data-v="time" class="${si.mode === 'time' ? 'on' : ''}">Timed</button>
-        <button data-act="mode" data-v="reps" class="${si.mode === 'reps' ? 'on' : ''}">Reps</button>
+      <div class="step-top">
+        <div class="step-preview" data-ex="${ex.id}"></div>
+        <div class="step-side">
+          <div class="seg" role="group" aria-label="Measure by">
+            <button data-act="mode" data-v="time" class="${si.mode === 'time' ? 'on' : ''}">Timed</button>
+            <button data-act="mode" data-v="reps" class="${si.mode === 'reps' ? 'on' : ''}">Reps</button>
+          </div>
+          ${ex.sided ? `<label class="mini-switch"><span>Both sides</span><button class="toggle sm ${s.sides === 'one' ? '' : 'on'}" data-act="sides" role="switch" aria-checked="${s.sides !== 'one'}"><span></span></button></label>` : ''}
+          <div class="step-actions">
+            <button class="btn-icon sm" data-act="dup" aria-label="Duplicate">${icon('copy')}</button>
+            <button class="btn-icon sm" data-act="info" aria-label="How to do it">${icon('info')}</button>
+            <button class="btn-icon sm danger" data-act="remove" aria-label="Remove">${icon('trash')}</button>
+          </div>
+        </div>
       </div>
-      <div class="fields">
+      <div class="tiles">
         ${si.mode === 'time'
-          ? `<label>Duration${si.sided ? ' (per side)' : ''} ${stepper('duration', si.duration, 5, 5, 600, 's')}</label>`
-          : `<label>Reps${si.sided ? ' (per side)' : ''} ${stepper('reps', si.reps, 1, 1, 200)}</label>`}
-        <label>Sets ${stepper('sets', si.sets, 1, 1, 20)}</label>
-        ${si.sets > 1 ? `<label>Rest between sets ${stepper('setRest', si.setRest, 5, 0, 300, 's')}</label>` : ''}
-        <label>Rest after <span class="muted">(blank = routine default)</span> ${stepper('rest', s.rest ?? '', 5, 0, 300, 's')}</label>
-        ${ex.sided ? `<label class="switch-row"><span>Do both sides</span><button class="toggle ${s.sides === 'one' ? '' : 'on'}" data-act="sides" role="switch" aria-checked="${s.sides !== 'one'}"><span></span></button></label>` : ''}
-      </div>
-      <div class="step-actions">
-        <button class="btn-icon" data-act="up" ${i === 0 ? 'disabled' : ''} aria-label="Move up">${icon('up')}</button>
-        <button class="btn-icon" data-act="down" ${i === n - 1 ? 'disabled' : ''} aria-label="Move down">${icon('down')}</button>
-        <button class="btn-icon" data-act="dup" aria-label="Duplicate">${icon('copy')}</button>
-        <button class="btn-icon" data-act="info" aria-label="How to do it">${icon('info')}</button>
-        <button class="btn-icon danger" data-act="remove" aria-label="Remove">${icon('trash')}</button>
+          ? tile(`Duration${per}`, stepper('duration', si.duration, 5, 5, 600, 's'))
+          : tile(`Reps${per}`, stepper('reps', si.reps, 1, 1, 200))}
+        ${tile('Sets', stepper('sets', si.sets, 1, 1, 20))}
+        ${si.weight !== null ? tile('Weight', stepper('weight', si.weight, weightInc(), 0, db.settings.units === 'kg' ? 500 : 1000, db.settings.units)) : ''}
+        ${si.sets > 1 ? tile('Rest between sets', stepper('setRest', si.setRest, 5, 0, 300, 's')) : ''}
+        ${tile('Rest after', stepper('rest', s.rest ?? '', 5, 0, 300, 's', routineRest))}
       </div>
     </div>` : ''}
   </li>`;
@@ -414,7 +513,7 @@ function pickExercises(routine, onDone) {
   const s = sheet(`
     <div class="sheet-head"><h3>Add exercises</h3><button class="btn small primary" data-act="done">Done</button></div>
     <div class="search">${icon('search')}<input type="search" placeholder="Search exercises or muscles" aria-label="Search"></div>
-    <div class="chips" role="group">${['all', 'stretch', 'strength'].map((f) => `<button class="chip ${f === 'all' ? 'on' : ''}" data-f="${f}">${f === 'all' ? 'All' : f === 'stretch' ? 'Stretches' : 'Strength'}</button>`).join('')}</div>
+    <div class="chips" role="group">${typeChips('all')}</div>
     ${areaChips('all')}
     <div class="pick-list"></div>`, { cls: 'tall', onClose: () => { figs.forEach((f) => f.stop()); onDone(); } });
   const list = $('.pick-list', s.el);
@@ -509,7 +608,7 @@ function viewLibrary() {
   app.innerHTML = `
     <header class="top"><h1>Exercises</h1><a class="btn-icon accent" href="#/custom/new" aria-label="New custom exercise">${icon('plus')}</a></header>
     <div class="search">${icon('search')}<input type="search" placeholder="Search exercises or muscles" value="${esc(libQuery)}" aria-label="Search"></div>
-    <div class="chips">${['all', 'stretch', 'strength'].map((f) => `<button class="chip ${f === libFilter ? 'on' : ''}" data-f="${f}">${f === 'all' ? 'All' : f === 'stretch' ? 'Stretches' : 'Strength'}</button>`).join('')}</div>
+    <div class="chips">${typeChips(libFilter)}</div>
     ${areaChips(libArea)}
     <p class="lib-count muted small"></p>
     <div class="ex-grid"></div>`;
@@ -545,9 +644,9 @@ function viewExercise(id) {
     <div class="ex-detail" style="--acc:${typeVar(ex.type)}">
       <div class="ex-hero"></div>
       <div class="ex-title">
-        <span class="pill ${ex.type}">${ex.type === 'strength' ? 'Strength' : 'Stretch'}</span>
+        <span class="pill ${ex.type}">${typeLabel(ex.type)}</span>
         <h1>${esc(ex.name)}</h1>
-        <p class="muted">${ex.mode === 'time' ? `${fmtTime(ex.duration)} hold` : `${ex.reps} reps`}${ex.sided ? ' · each side' : ''}${ex.equipment ? ` · ${esc(ex.equipment)}` : ''}</p>
+        <p class="muted">${ex.mode === 'time' ? `${fmtTime(ex.duration)}${ex.type === 'stretch' ? ' hold' : ''}` : `${ex.reps} reps`}${ex.sided ? ' · each side' : ''}${ex.equipment ? ` · ${esc(ex.equipment)}` : ''}</p>
       </div>
       <section class="card">
         <h3>Muscles</h3>
@@ -590,7 +689,7 @@ function viewCustomEditor(id) {
     <header class="top"><a class="btn-icon" href="#/library" aria-label="Cancel">${icon('back')}</a><div class="top-title">${isNew ? 'New exercise' : 'Edit exercise'}</div><span></span></header>
     <form class="form" autocomplete="off">
       <label>Name<input name="name" required maxlength="50" value="${esc(c.name)}" placeholder="e.g. Doorway Pec Stretch"></label>
-      <div class="seg" data-group="type"><button type="button" data-v="stretch" class="${c.type === 'stretch' ? 'on' : ''}">Stretch</button><button type="button" data-v="strength" class="${c.type === 'strength' ? 'on' : ''}">Strength</button></div>
+      <div class="seg" data-group="type">${Object.entries(TYPES).map(([k, t]) => `<button type="button" data-v="${k}" class="${c.type === k ? 'on' : ''}">${t.label}</button>`).join('')}</div>
       <div class="seg" data-group="mode"><button type="button" data-v="time" class="${c.mode === 'time' ? 'on' : ''}">Timed</button><button type="button" data-v="reps" class="${c.mode === 'reps' ? 'on' : ''}">Reps</button></div>
       <div class="row2">
         <label>Default seconds<input name="duration" type="number" inputmode="numeric" min="5" max="600" value="${c.duration}"></label>
@@ -706,6 +805,7 @@ function viewSettings() {
       ${tog('beeps', 'Countdown beeps', '3-2-1 before each change')}
       <label class="switch-row"><span>Get ready time</span>${stepper('prep', S.prep, 5, 0, 60, 's')}</label>
       <label class="switch-row"><span>Switch sides pause</span>${stepper('switchTime', S.switchTime, 1, 0, 30, 's')}</label>
+      <div class="switch-row"><span>Weight units</span><div class="seg units">${['lb', 'kg'].map((u) => `<button data-units="${u}" class="${S.units === u ? 'on' : ''}">${u}</button>`).join('')}</div></div>
       <button class="btn ghost wide" data-act="test">Test sound</button>
     </section>
     <section class="card settings">
@@ -715,12 +815,19 @@ function viewSettings() {
       <label class="btn ghost wide file-btn">Import backup<input type="file" accept="application/json,.json" hidden></label>
       <button class="btn ghost wide" data-act="starters">Add starter routines</button>
     </section>
-    <p class="muted center small">Limber · stretch &amp; calisthenics guide<br>Listen to your body — stop if anything hurts.</p>`;
+    <p class="muted center small">Limber · stretching, calisthenics &amp; free weights<br>Listen to your body — stop if anything hurts.</p>`;
   settingsFig?.stop();
   settingsFig = renderFigure($('.coach-preview', app), BUILTIN.get('side-bend'), { aspect: 0.9 });
   app.onclick = (e) => {
-    const t = e.target.closest('[data-tog],[data-act],[data-coach],[data-skin]');
+    const t = e.target.closest('[data-tog],[data-act],[data-coach],[data-skin],[data-units]');
     if (!t) return;
+    if (t.dataset.units && t.dataset.units !== S.units) {
+      // Convert weights already set on routine steps so they mean the same load.
+      const f = t.dataset.units === 'kg' ? 1 / LB_PER_KG : LB_PER_KG;
+      db.routines.forEach((r) => r.steps.forEach((st) => { if (st.weight != null) st.weight = roundWeight(st.weight * f); }));
+      S.units = t.dataset.units; save(); viewSettings();
+      return;
+    }
     if (t.dataset.coach || t.dataset.skin) {
       if (t.dataset.coach) S.coach = t.dataset.coach;
       if (t.dataset.skin) S.skin = +t.dataset.skin;
@@ -830,7 +937,8 @@ function viewPlayer(id) {
   function describe(p) {
     const side = p.side ? `, ${p.side.toLowerCase()} side` : '';
     const amount = p.mode === 'time' ? `${p.dur} seconds` : `${p.reps} reps`;
-    return `${p.ex.name}${side}. ${amount}.`;
+    const load = p.weight ? ` ${+p.weight.toFixed(1)} ${S.units === 'kg' ? 'kilos' : 'pounds'}.` : '';
+    return `${p.ex.name}${side}. ${amount}.${load}`;
   }
 
   function setFigure(ex, dim) {
@@ -875,9 +983,9 @@ function viewPlayer(id) {
     el.root.dataset.mode = p.kind === 'work' ? p.mode : 'time';
 
     if (p.kind === 'work') {
-      el.kicker.textContent = p.ex.type === 'strength' ? 'Strength' : 'Stretch';
+      el.kicker.textContent = typeLabel(p.ex.type);
       el.name.textContent = p.ex.name;
-      el.chips.innerHTML = [p.side && `<span class="chip on">${p.side} side</span>`, p.sets > 1 && `<span class="chip">Set ${p.set} of ${p.sets}</span>`].filter(Boolean).join('');
+      el.chips.innerHTML = [p.side && `<span class="chip on">${p.side} side</span>`, p.sets > 1 && `<span class="chip">Set ${p.set} of ${p.sets}</span>`, p.weight && `<span class="chip">${fmtWeight(p.weight)}</span>`].filter(Boolean).join('');
       setFigure(p.ex, false);
       rotateCues(p.ex);
       if (!silent) { beep(1046, 0.22); say(describe(p)); }
@@ -885,7 +993,7 @@ function viewPlayer(id) {
       const n = p.next;
       el.kicker.textContent = p.kind === 'prep' ? 'Get ready' : p.kind === 'switch' ? 'Switch sides' : 'Rest';
       el.name.textContent = p.kind === 'switch' ? `${p.side} side next` : n ? `Next: ${n.ex.name}` : 'Almost done';
-      el.chips.innerHTML = n ? `<span class="chip">${n.mode === 'time' ? fmtTime(n.dur) : `${n.reps} reps`}${n.side ? ` · ${n.side}` : ''}</span>` : '';
+      el.chips.innerHTML = n ? `<span class="chip">${n.mode === 'time' ? fmtTime(n.dur) : `${n.reps} reps`}${n.weight ? ` · ${fmtWeight(n.weight)}` : ''}${n.side ? ` · ${n.side}` : ''}</span>` : '';
       if (n) { setFigure(n.ex, true); rotateCues(n.ex); }
       if (!silent) {
         if (p.kind === 'prep') say(`Get ready. First up: ${n ? describe(n) : ''}`);

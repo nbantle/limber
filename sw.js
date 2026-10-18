@@ -1,8 +1,8 @@
 // Offline support: serve the app shell from cache, refresh it in the background.
-const CACHE = 'limber-v5';
+const CACHE = 'limber-v6';
 const ASSETS = [
   './', './index.html', './styles.css', './manifest.webmanifest',
-  './js/app.js', './js/figure.js', './js/exercises.js', './js/exercises-more.js', './js/muscles.js', './js/audio.js', './js/character2.js',
+  './js/app.js', './js/figure.js', './js/exercises.js', './js/exercises-more.js', './js/exercises-weights.js', './js/muscles.js', './js/audio.js', './js/character2.js',
   './icons/apple-touch-icon.png', './icons/icon-192.png', './icons/icon-512.png',
 ];
 

@@ -106,10 +106,11 @@ const P = {
   farmFront: [[0, 1.65, 1.6], [0.3, 1.8, 1.7], [1, 1.15, 1.1]],
   neck: [[0, 1.75, 1.75], [1, 1.5, 1.5]],
 };
-// Torso, from slightly below the hip joint (glutes) to the neck. Side: [u, front, back]. Front: [u, half-width, half-width].
+// Torso. Side: [u, front, back], from the hip joint to the neck — the seat is a separate glute shape
+// (J.glute) so it stays round whichever way the hips fold. Front: [u, half-width, half-width], from below the hip.
 const TORSO = {
-  sideF: [[-0.14, 2.6, 4.4], [0, 4.2, 5.7], [0.18, 3.9, 4.9], [0.38, 3.6, 4.0], [0.6, 4.3, 4.3], [0.74, 5.5, 4.6], [0.88, 4.4, 4.5], [1, 2.2, 2.6]],
-  sideM: [[-0.14, 2.6, 4.1], [0, 4.3, 5.3], [0.18, 4.1, 4.7], [0.38, 3.9, 4.1], [0.6, 4.5, 4.4], [0.74, 5.1, 4.8], [0.88, 4.5, 4.6], [1, 2.3, 2.7]],
+  sideF: [[0, 3.4, 4.4], [0.1, 3.9, 5.0], [0.24, 3.8, 4.5], [0.38, 3.6, 4.0], [0.6, 4.3, 4.3], [0.74, 5.5, 4.6], [0.88, 4.4, 4.5], [1, 2.2, 2.6]],
+  sideM: [[0, 3.5, 4.2], [0.1, 4.1, 4.8], [0.24, 4.0, 4.4], [0.38, 3.9, 4.1], [0.6, 4.5, 4.4], [0.74, 5.1, 4.8], [0.88, 4.5, 4.6], [1, 2.3, 2.7]],
   frontF: [[-0.12, 3.2, 3.2], [0, 6.2, 6.2], [0.16, 6.3, 6.3], [0.4, 4.9, 4.9], [0.62, 5.4, 5.4], [0.8, 6.2, 6.2], [0.9, 6.4, 6.4], [0.97, 4.4, 4.4], [1, 2.2, 2.2]],
   frontM: [[-0.12, 3.4, 3.4], [0, 6.0, 6.0], [0.16, 5.9, 5.9], [0.4, 5.5, 5.5], [0.62, 6.0, 6.0], [0.8, 6.7, 6.7], [0.9, 6.8, 6.8], [0.97, 4.8, 4.8], [1, 2.4, 2.4]],
 };
@@ -121,7 +122,7 @@ const MUSCLE = {
   chest: ['torso', 0.62, 0.88, 'front'], abs: ['torso', 0.16, 0.58, 'front'], obliques: ['torso', 0.18, 0.62, 'both'],
   lowerBack: ['torso', 0.08, 0.45, 'back'], upperBack: ['torso', 0.58, 0.9, 'back'], lats: ['torso', 0.42, 0.85, 'back'],
   traps: ['torso', 0.86, 1, 'back'], shoulders: ['ua', 0, 0.35, 'both'], biceps: ['ua', 0.2, 0.9, 'front'],
-  triceps: ['ua', 0.2, 0.9, 'back'], forearms: ['fa', 0.1, 0.8, 'both'], neck: ['neck', 0, 1, 'both'],
+  triceps: ['ua', 0.2, 0.9, 'back'], forearms: ['fa', 0.1, 0.8, 'both'], neck: ['neck', -0.1, 0.4, 'both'],
 };
 
 // ───────────── Styles ─────────────
@@ -159,6 +160,7 @@ export const STYLES = {
 };
 
 const HL = '#ff5a1f';
+const GLUTE_R = 4.2; // matches GLUTE.r in figure.js
 
 // App-facing look: which coach and skin tone the Studio character uses.
 export const COACHES = { a: { label: 'Ava', person: 'ava' }, b: { label: 'Max', person: 'max' } };
@@ -167,10 +169,10 @@ let look = { person: 'ava', skin: SKINS[1] };
 export function setLook(coach, skin) {
   look = { person: (COACHES[coach] ?? COACHES.a).person, skin: SKINS[skin] ?? SKINS[1] };
 }
-export const paint = (J, view, hot, hotSegs) => paint2(J, view, 'studio', look.person, hot, hotSegs, look.skin);
+export const paint = (J, view, hot, hotSegs, floor) => paint2(J, view, 'studio', look.person, hot, hotSegs, look.skin, floor);
 
-// Paint one frame. view: 'side' | 'front' | 'back'.
-export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, skinOverride = null) {
+// Paint one frame. view: 'side' | 'front' | 'back'. floor: keep hair above y = 0.
+export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, skinOverride = null, floor = false) {
   const S = STYLES[styleKey], who = S.people[personKey];
   const ops = [];
   const side = view === 'side', back = view === 'back';
@@ -267,15 +269,22 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
     ops.push({ tag: 'path', d: `M${f(L(1.2, -1.2)[0])} ${f(L(1.2, -1.2)[1])}L${f(L(3.6, -0.6)[0])} ${f(L(3.6, -0.6)[1])}`, stroke: far('#ffffff', isFar), 'stroke-width': 0.45, 'stroke-linecap': 'round', 'stroke-dasharray': '0.5 0.8', fill: 'none', opacity: 0.85 });
   };
 
+  // Side-view seat: a round glute behind the hip (see GLUTE in figure.js).
+  const seat = (grow = 0) => {
+    const c = J.glute, r = GLUTE_R * sc + grow;
+    return smooth(Array.from({ length: 12 }, (_, i) => [c[0] + Math.cos((i / 12) * 2 * Math.PI) * r, c[1] + Math.sin((i / 12) * 2 * Math.PI) * r]));
+  };
   const torso = () => {
     const fr = frame(J, 'hip', 'neck', true);
     // Torso profile is [u, +N, −N]; +N is the front in side view.
     const prof = torsoProf.map(([u, a, b]) => [u, a, b]);
     frames.torso = { fr, prof };
-    if (who.mono) { push(part(fr, prof, -0.14, 1, { scale: sc }), skin); return; }
-    push(part(fr, prof, -0.14, 1, { scale: sc }), skin);
+    const u0 = side ? 0 : -0.14, glute = side && J.glute;
+    if (who.mono) { push(part(fr, prof, u0, 1, { scale: sc }), skin); if (glute) push(seat(), skin); return; }
+    push(part(fr, prof, u0, 1, { scale: sc }), skin);
+    if (glute) push(seat(0.1), who.bottom);
     if (fem) {
-      push(part(fr, prof, -0.14, 0.34, { capB: false, grow: 0.1, scale: sc }), who.bottom);
+      push(part(fr, prof, u0, 0.34, { capB: false, grow: 0.1, scale: sc }), who.bottom);
       push(part(fr, prof, 0.56, back ? 0.86 : 0.9, { capA: false, capB: false, grow: 0.1, scale: sc }), who.top);
       if (!side) {
         // Straps (front) or racerback (back).
@@ -286,7 +295,7 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       }
     } else {
       push(part(fr, prof, 0.2, 1, { capA: false, grow: 0.25, scale: sc }), who.top);
-      push(part(fr, prof, -0.14, 0.26, { capB: false, grow: 0.3, scale: sc }), who.bottom);
+      push(part(fr, prof, u0, 0.26, { capB: false, grow: 0.3, scale: sc }), who.bottom);
       if (!side && !back) {
         const T = fr.tan(1), N = [-T[1], T[0]], c = fr.at(0.985);
         const a = add(c, N, 2.3 * sc), b = add(c, N, -2.3 * sc), m = add(c, T, -1.6 * sc);
@@ -336,8 +345,9 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
         const p2 = add(add(p1, bk, 0.35 * R), g, 0.8 * R);
         const p3 = add(add(p2, bk, 0.05 * R), g, 0.8 * R);
         const p4 = add(p3, g, 0.5 * R);
-        const T = [p0, p1, p2, p3, p4];
         const rads = [0.36, 0.44, 0.42, 0.3, 0.1];
+        // Lying down, the ponytail rests on the floor instead of hanging through it.
+        const T = [p0, p1, p2, p3, p4].map((p, i) => (floor ? [p[0], Math.min(p[1], -rads[i] * R - 0.15)] : p));
         const fr = { at: (u) => { const i = Math.min(3, Math.floor(u * 4)); const k = u * 4 - i; return [T[i][0] + (T[i + 1][0] - T[i][0]) * k, T[i][1] + (T[i + 1][1] - T[i][1]) * k]; }, tan: (u) => { const i = Math.min(3, Math.floor(u * 4)); return norm([T[i + 1][0] - T[i][0], T[i + 1][1] - T[i][1]]); } };
         push(part(fr, rads.map((r, i) => [i / 4, r * R, r * R]), 0, 1), who.hair);
       }
@@ -401,6 +411,16 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
   for (const m of hot) {
     const spec = MUSCLE[m];
     if (!spec) continue;
+    if (m === 'glutes' && side && J.glute) {
+      // Arc around the back of the seat, facing away from the hip.
+      const c = J.glute, a0 = Math.atan2(c[1] - J.hip[1], c[0] - J.hip[0]), r = GLUTE_R * sc * 0.55;
+      const d = smooth(Array.from({ length: 7 }, (_, i) => { const a = a0 + ((i - 3) / 3) * 1.1; return [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r]; }), true);
+      if (S.highlight === 'dash') {
+        ops.push({ tag: 'path', d, fill: 'none', stroke: HL, 'stroke-width': 2.6, 'stroke-linecap': 'round', opacity: 0.18 });
+        ops.push({ tag: 'path', d, fill: 'none', stroke: HL, 'stroke-width': 1.0, 'stroke-linecap': 'round', 'stroke-dasharray': '1.6 1.25' });
+      } else ops.push({ tag: 'path', d: seat(-0.8), fill: HL, opacity: S.highlight === 'fill' ? 0.55 : 0.95 });
+      continue;
+    }
     const [kind, u0, u1, where] = spec;
     let names = kind === 'torso' || kind === 'neck' ? [kind] : side ? [kind + 'R'] : [kind + 'L', kind + 'R'];
     if (allow && kind !== 'torso' && kind !== 'neck') names = [...allow].filter((n) => n.startsWith(kind));

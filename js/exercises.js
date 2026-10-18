@@ -1,8 +1,9 @@
 // Built-in exercise library.
-// type: 'stretch' | 'strength'. mode: 'time' | 'reps'. sided: done once per side.
+// type: 'stretch' | 'strength' (shown as Calisthenics) | 'weights'. mode: 'time' | 'reps'. sided: done once per side.
 // Animation poses are documented in figure.js.
 
 import { MORE, AREAS } from './exercises-more.js';
+import { WEIGHTS } from './exercises-weights.js';
 
 export { AREAS };
 
@@ -108,6 +109,16 @@ export const EXERCISES = [
     ] },
   },
   {
+    id: 'single-leg-forward-fold', name: 'Single-Leg Forward Fold', type: 'stretch', mode: 'time', duration: 30, sided: true,
+    primary: ['hamstrings'], secondary: ['lowerBack', 'calves', 'adductors'],
+    cues: ['Sit with one leg straight out, toes pointing up.', 'Bend the other knee out to the side and rest that foot against your inner thigh.', 'Sit tall, then turn your chest toward the straight leg and fold forward from the hips.', 'Reach for your shin, ankle, or foot. Keep the straight knee soft if needed.'],
+    // Near leg is the bent one: its knee points toward the viewer, so its thigh and shin are foreshortened.
+    anim: { hotSegs: ['thL', 'shL'], dur: 2.6, frames: [
+      { t: 20, h: 30, aL: [118, 108], aR: [116, 106], kth: [1, 0.6], ksh: [1, 0.5], lR: [100, 264, 266], lL: [90, 90, 0] },
+      { t: 60, h: 80, c: 2, aL: [98, 92], aR: [96, 90], kth: [1, 0.6], ksh: [1, 0.5], lR: [100, 264, 266], lL: [90, 90, 0] },
+    ] },
+  },
+  {
     id: 'butterfly', name: 'Butterfly Stretch', type: 'stretch', mode: 'time', duration: 30,
     primary: ['adductors'], secondary: ['hipFlexors', 'glutes'],
     cues: ['Sit with the soles of your feet together, knees out to the sides.', 'Hold your feet and sit up tall.', 'Let your knees relax toward the floor — don\'t push them down.', 'For more stretch, hinge forward with a long back.'],
@@ -139,7 +150,7 @@ export const EXERCISES = [
     primary: ['abs', 'hipFlexors'], secondary: ['chest', 'lowerBack'],
     cues: ['Lie face down with hands under your shoulders.', 'Press gently to lift your chest, keeping hips on the floor.', 'Keep elbows soft and shoulders away from your ears.', 'Only lift as high as feels comfortable for your lower back.'],
     anim: { plant: ['handL', 'handR'], anchor: 'hip', dur: 2.6, frames: [
-      { t: 84, h: 88, aL: [235, 115], aR: [235, 115], lL: [270, 270, 270], lR: [270, 270, 270] },
+      { t: 84, h: 88, aL: [290, 155], aR: [290, 155], lL: [270, 270, 270], lR: [270, 270, 270] },
       { t: 58, h: 30, c: -4, aL: [200, 160], aR: [200, 160], lL: [270, 270, 270], lR: [270, 270, 270] },
     ] },
   },
@@ -166,8 +177,8 @@ export const EXERCISES = [
     primary: ['glutes', 'hipFlexors'], secondary: ['lowerBack'],
     cues: ['From hands and knees, bring one knee forward behind your wrist.', 'Extend the other leg straight back along the floor.', 'Square your hips and stay upright, or fold forward over the front leg.', 'Use a cushion under the front hip if it doesn\'t reach the floor.'],
     anim: { anchor: 'hip', dur: 3, frames: [
-      { t: 8, aL: [170, 176], aR: [168, 174], lR: [94, 266], lL: [268, 270, 270] },
-      { t: 72, h: 92, c: 3, aL: [96, 92], aR: [96, 92], lR: [94, 266], lL: [268, 270, 270] },
+      { t: 8, aL: [170, 176], aR: [168, 174], ksh: [1, 0.45], lR: [94, 262, 262], lL: [268, 270, 270] },
+      { t: 72, h: 92, c: 3, aL: [96, 92], aR: [96, 92], ksh: [1, 0.45], lR: [94, 262, 262], lL: [268, 270, 270] },
     ] },
   },
   {
@@ -175,8 +186,8 @@ export const EXERCISES = [
     primary: ['obliques', 'lats'], secondary: ['shoulders'],
     cues: ['Stand tall with feet hip-width apart.', 'Reach one arm overhead.', 'Lean to the opposite side, reaching up and over.', 'Keep both feet grounded and hips square.'],
     anim: { view: 'front', dur: 2.6, frames: [
-      { ...STAND_F, t: -4, aR: [2, 356], aL: [194, 188] },
-      { ...STAND_F, t: -22, h: -26, aR: [330, 304], aL: [200, 192] },
+      { ...STAND_F, t: -4, pv: 0, aR: [2, 356], aL: [194, 188] },
+      { ...STAND_F, t: -22, pv: 0, h: -26, aR: [336, 306], aL: [200, 192] },
     ] },
   },
   {
@@ -184,8 +195,8 @@ export const EXERCISES = [
     primary: ['hamstrings'], secondary: ['calves'],
     cues: ['Lie on your back with both legs straight.', 'Lift one leg and hold behind the thigh or calf.', 'Keep the leg as straight as is comfortable and gently pull it toward you.', 'Keep your head and the other leg relaxed on the floor.'],
     anim: { anchor: 'hip', dur: 2.6, frames: [
-      { t: 270, aR: [40, 20], aL: [42, 22], lR: [12, 12, 102], lL: [90, 90, 0] },
-      { t: 270, aR: [30, 14], aL: [32, 16], lR: [-2, -2, 88], lL: [90, 90, 0] },
+      { t: 270, aR: [40, 20], aL: [42, 22], lR: [12, 12, 278], lL: [90, 90, 0] },
+      { t: 270, aR: [30, 14], aL: [32, 16], lR: [-2, -2, 262], lL: [90, 90, 0] },
     ] },
   },
   {
@@ -224,8 +235,8 @@ export const EXERCISES = [
     primary: ['chest', 'triceps'], secondary: ['shoulders', 'abs'],
     cues: ['Start on hands and knees, then walk your hands forward.', 'Keep a straight line from your head to your knees.', 'Lower your chest toward the floor with control.', 'Press back up — a great way to build toward full push-ups.'],
     anim: { anchor: 'kneeR', plant: ['handL', 'handR'], dur: 0.9, frames: [
-      { t: 51, aL: [180, 180], aR: [180, 180], lL: [231, 276, 300], lR: [231, 276, 300] },
-      { t: 75, aL: [265, 150], aR: [265, 150], lL: [255, 276, 300], lR: [255, 276, 300] },
+      { t: 51, aL: [180, 180], aR: [180, 180], lL: [231, 276, 250], lR: [231, 276, 250] },
+      { t: 75, aL: [265, 150], aR: [265, 150], lL: [255, 276, 250], lR: [255, 276, 250] },
     ] },
   },
   {
@@ -234,7 +245,7 @@ export const EXERCISES = [
     cues: ['Start in an upside-down V with hips high.', 'Bend your elbows to lower the top of your head toward the floor.', 'Keep your hips high throughout.', 'Press back up to the start.'],
     anim: { anchor: 'toeR', plant: ['handL', 'handR'], dur: 0.9, frames: [
       { t: 135, h: 145, aL: [135, 135], aR: [135, 135], lL: [205, 205, 120], lR: [205, 205, 120] },
-      { t: 160, h: 170, aL: [45, 165], aR: [45, 165], lL: [210, 210, 120], lR: [210, 210, 120] },
+      { t: 156, h: 168, aL: [300, 150], aR: [300, 150], lL: [210, 210, 120], lR: [210, 210, 120] },
     ] },
   },
   {
@@ -286,9 +297,11 @@ export const EXERCISES = [
     id: 'mountain-climbers', name: 'Mountain Climbers', type: 'strength', mode: 'time', duration: 30,
     primary: ['abs', 'hipFlexors'], secondary: ['shoulders', 'quads'],
     cues: ['Start in a high plank, hands under shoulders.', 'Drive one knee toward your chest, then switch quickly.', 'Keep your hips level and core tight.', 'Keep your shoulders over your wrists.'],
-    anim: { anchor: 'handR', plant: ['handL', 'handR'], dur: 0.34, hold: 0.1, frames: [
-      { ...PLANK, lR: [150, 235, 150], lL: [250, 250, 150] },
-      { ...PLANK, lL: [150, 235, 150], lR: [250, 250, 150] },
+    anim: { anchor: 'handR', plant: ['handL', 'handR'], steady: true, arrow: 'kneeR', dur: 0.17, hold: 0, frames: [
+      { ...PLANK, lR: [105, 250, 160], lL: [250, 250, 150] },
+      { ...PLANK, lR: [195, 292, 205], lL: [168, 282, 195] },
+      { ...PLANK, lL: [105, 250, 160], lR: [250, 250, 150] },
+      { ...PLANK, lL: [195, 292, 205], lR: [168, 282, 195] },
     ] },
   },
   {
@@ -306,9 +319,9 @@ export const EXERCISES = [
     cues: ['From standing, squat down and place your hands on the floor.', 'Jump or step your feet back into a plank.', 'Jump or step your feet back toward your hands.', 'Stand and jump up, reaching overhead. Modify by stepping instead of jumping.'],
     anim: { anchor: 'shoulderR', dur: 0.55, hold: 0.1, frames: [
       { ...STAND },
-      { t: 60, h: 80, aL: [168, 172], aR: [168, 172], lL: [65, 212, 90], lR: [65, 212, 90] },
+      { t: 60, h: 80, aL: [168, 172], aR: [168, 172], lL: [72, 212, 90], lR: [72, 212, 90] },
       { ...PLANK },
-      { t: 60, h: 80, aL: [168, 172], aR: [168, 172], lL: [65, 212, 90], lR: [65, 212, 90] },
+      { t: 60, h: 80, aL: [168, 172], aR: [168, 172], lL: [72, 212, 90], lR: [72, 212, 90] },
       { t: -3, aL: [8, 4], aR: [8, 4], lL: [182, 182, 150], lR: [182, 182, 150], lift: 7 },
     ] },
   },
@@ -327,7 +340,7 @@ export const EXERCISES = [
     cues: ['Lie on your back with legs straight and arms by your sides.', 'Press your lower back into the floor.', 'Raise your legs together until they point at the ceiling.', 'Lower slowly — stop before your back arches.'],
     anim: { anchor: 'hip', dur: 1.1, frames: [
       { t: 270, aL: [90, 90], aR: [90, 90], lL: [88, 88, 0], lR: [88, 88, 0] },
-      { t: 270, aL: [90, 90], aR: [90, 90], lL: [4, 4, 94], lR: [4, 4, 94] },
+      { t: 270, aL: [90, 90], aR: [90, 90], lL: [4, 4, 300], lR: [4, 4, 300] },
     ] },
   },
   {
@@ -370,7 +383,7 @@ export const EXERCISES = [
     id: 'high-knees', name: 'High Knees', type: 'strength', mode: 'time', duration: 30,
     primary: ['hipFlexors', 'quads'], secondary: ['calves', 'abs'],
     cues: ['Run in place, driving your knees up to hip height.', 'Pump your arms.', 'Stay light on the balls of your feet.', 'Keep your chest tall.'],
-    anim: { anchor: 'hip', dur: 0.3, hold: 0.05, frames: [
+    anim: { anchor: 'hip', steady: true, dur: 0.3, hold: 0.05, frames: [
       { t: 0, aL: [150, 60], aR: [210, 120], lR: [92, 190, 150], lL: [182, 180, 150] },
       { t: 0, aR: [150, 60], aL: [210, 120], lL: [92, 190, 150], lR: [182, 180, 150] },
     ] },
@@ -390,9 +403,9 @@ export const EXERCISES = [
     cues: ['Lie on your back, arms pointing at the ceiling, knees bent at 90° above your hips.', 'Press your lower back into the floor.', 'Slowly extend one arm overhead and the opposite leg out.', 'Return and switch sides.'],
     anim: { anchor: 'hip', dur: 1, hold: 0.2, frames: [
       { t: 270, aL: [0, 0], aR: [0, 0], lL: [0, 90, 0], lR: [0, 90, 0] },
-      { t: 270, aL: [0, 0], aR: [285, 282], lL: [78, 82, 0], lR: [0, 90, 0] },
+      { t: 270, aL: [0, 0], aR: [276, 276], lL: [80, 82, 10], lR: [0, 90, 0] },
       { t: 270, aL: [0, 0], aR: [0, 0], lL: [0, 90, 0], lR: [0, 90, 0] },
-      { t: 270, aL: [285, 282], aR: [0, 0], lL: [0, 90, 0], lR: [78, 82, 0] },
+      { t: 270, aL: [276, 276], aR: [0, 0], lL: [0, 90, 0], lR: [80, 82, 10] },
     ] },
   },
   {
@@ -415,7 +428,7 @@ export const EXERCISES = [
   },
 ];
 
-EXERCISES.push(...MORE);
+EXERCISES.push(...MORE, ...WEIGHTS);
 
 export const STARTER_ROUTINES = [
   {
@@ -473,6 +486,19 @@ export const STARTER_ROUTINES = [
       { ex: 'reverse-lunge', reps: 8 },
       { ex: 'plank', duration: 30 },
       { ex: 'dead-bug', reps: 10 },
+    ],
+  },
+  {
+    name: 'Dumbbell Full Body',
+    rest: 45,
+    steps: [
+      { ex: 'goblet-squat', reps: 10, sets: 3 },
+      { ex: 'db-bench-press', reps: 10, sets: 3 },
+      { ex: 'db-row', reps: 10, sets: 2 },
+      { ex: 'db-rdl', reps: 10, sets: 3 },
+      { ex: 'db-shoulder-press', reps: 10, sets: 2 },
+      { ex: 'db-curl', reps: 12, sets: 2 },
+      { ex: 'farmers-carry', duration: 40, sets: 2 },
     ],
   },
   {

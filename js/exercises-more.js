@@ -32,9 +32,10 @@ export const MORE = [
     id: 'figure-four', name: 'Lying Glute Stretch', type: 'stretch', mode: 'time', duration: 30, sided: true,
     primary: ['glutes'], secondary: ['hipFlexors', 'lowerBack'],
     cues: ['Lie on your back with knees bent.', 'Cross one ankle over the opposite knee to make a "4".', 'Reach through and hold behind the bottom thigh.', 'Gently pull it toward you until you feel the stretch in your hip.'],
-    anim: { anchor: 'hip', dur: 2.6, frames: [
-      { t: 270, aL: [78, 62], aR: [78, 62], lL: [12, 92], lR: [62, 302, 10] },
-      { t: 270, aL: [70, 58], aR: [70, 58], lL: [354, 84], lR: [52, 290, 0] },
+    // The crossed shin runs across the body toward the viewer, so it's foreshortened (ksh) with its ankle on the far thigh.
+    anim: { anchor: 'hip', arrow: 'kneeL', dur: 2.6, frames: [
+      { t: 270, aL: [34, 90], aR: [34, 90], kth: [1, 0.8], ksh: [1, 0.46], lL: [5, 88, 0], lR: [50, 308, 10] },
+      { t: 270, aL: [16, 101], aR: [16, 101], kth: [1, 0.8], ksh: [1, 0.53], lL: [345, 73, 345], lR: [35, 288, 0] },
     ] },
   },
   {
@@ -60,8 +61,8 @@ export const MORE = [
     primary: ['hamstrings', 'lowerBack'], secondary: ['calves'],
     cues: ['Sit sideways next to a wall, then swing your legs up as you lie back.', 'Rest your legs against the wall, hips close to it.', 'Let your arms relax by your sides.', 'Breathe slowly and let your legs feel heavy.'],
     anim: { anchor: 'hip', props: [{ type: 'wall', at: 'hip', dx: 4.2 }], dur: 3, frames: [
-      { t: 270, aL: [100, 96], aR: [100, 96], lL: [0, 0, 90], lR: [0, 0, 90] },
-      { t: 270, aL: [102, 98], aR: [102, 98], lL: [-1, -1, 90], lR: [-1, -1, 90] },
+      { t: 270, aL: [100, 96], aR: [100, 96], lL: [0, 0, 282], lR: [0, 0, 282] },
+      { t: 270, aL: [102, 98], aR: [102, 98], lL: [-1, -1, 280], lR: [-1, -1, 280] },
     ] },
   },
   {
@@ -69,8 +70,8 @@ export const MORE = [
     primary: ['obliques', 'lats'], secondary: ['shoulders'],
     cues: ['Sit cross-legged and tall.', 'Place one hand on the floor beside you.', 'Reach the other arm up and over your head.', 'Lengthen through your side — keep both hips grounded.'],
     anim: { view: 'front', dur: 2.6, frames: [
-      { ...CROSS_F, t: -4, aR: [4, 0], aL: [200, 196] },
-      { ...CROSS_F, t: -22, h: -26, aR: [328, 302], aL: [212, 204] },
+      { ...CROSS_F, t: -4, pv: 0, aR: [4, 0], aL: [200, 196] },
+      { ...CROSS_F, t: -22, pv: 0, h: -26, aR: [334, 304], aL: [212, 204] },
     ] },
   },
   {
@@ -170,8 +171,8 @@ export const MORE = [
     primary: ['adductors'], secondary: ['quads', 'glutes'],
     cues: ['Stand with your feet wide apart.', 'Bend one knee and shift your hips toward it.', 'Keep the other leg straight and its foot flat.', 'Feel the stretch along the inside of the straight leg.'],
     anim: { view: 'front', anchor: 'ankleR', dur: 2.6, frames: [
-      { t: -2, ...HIPS_F, lL: [196, 178], lR: [166, 166] },
-      { t: -6, ...HIPS_F, lL: [210, 172], lR: [158, 158] },
+      { t: -2, pv: 0, ...HIPS_F, lL: [196, 178], lR: [166, 166] },
+      { t: -6, pv: 0, ...HIPS_F, lL: [210, 172], lR: [158, 158] },
     ] },
   },
   {
@@ -231,9 +232,9 @@ export const MORE = [
     cues: ['Stand with feet wider than your hips.', 'Reach one arm high overhead.', 'Sweep it down and across to touch the opposite foot or shin.', 'Come back up and alternate sides.'],
     anim: { view: 'front', dur: 0.8, hold: 0.2, frames: [
       { t: 0, aR: [6, 2], aL: [192, 186], lL: [190, 186], lR: [170, 174] },
-      { t: -40, h: -36, aR: [214, 206], aL: [328, 336], lL: [190, 186], lR: [170, 174] },
+      { t: -40, pv: 0, h: -36, aR: [214, 206], aL: [328, 336], lL: [190, 186], lR: [170, 174] },
       { t: 0, aL: [354, 358], aR: [168, 174], lL: [190, 186], lR: [170, 174] },
-      { t: 40, h: 36, aL: [146, 154], aR: [32, 24], lL: [190, 186], lR: [170, 174] },
+      { t: 40, pv: 0, h: 36, aL: [146, 154], aR: [32, 24], lL: [190, 186], lR: [170, 174] },
     ] },
   },
   {
@@ -320,14 +321,14 @@ export const MORE = [
     cues: ['Stand with feet together, hands at your chest.', 'Take a big step out to the side.', 'Bend that knee and push your hips back; keep the other leg straight.', 'Push off to return to standing.'],
     anim: { view: 'front', anchor: 'ankleR', dur: 0.9, frames: [
       { t: 0, aL: [170, 40], aR: [190, 320], lL: [182, 180], lR: [178, 180] },
-      { t: -4, aL: [170, 40], aR: [190, 320], lL: [214, 168], lR: [156, 156] },
+      { t: -4, pv: 0, aL: [170, 40], aR: [190, 320], lL: [214, 168], lR: [156, 156] },
     ] },
   },
   {
     id: 'butt-kicks', name: 'Butt Kicks', type: 'strength', mode: 'time', duration: 30,
     primary: ['hamstrings', 'quads'], secondary: ['calves'],
     cues: ['Jog in place.', 'Kick your heels up toward your glutes.', 'Stay light on the balls of your feet.', 'Pump your arms and keep your chest tall.'],
-    anim: { anchor: 'hip', dur: 0.3, hold: 0.05, frames: [
+    anim: { anchor: 'hip', steady: true, dur: 0.3, hold: 0.05, frames: [
       { t: 4, aL: [150, 60], aR: [210, 120], lR: [188, 340, 290], lL: [180, 180, 150], lift: 1 },
       { t: 4, aR: [150, 60], aL: [210, 120], lL: [188, 340, 290], lR: [180, 180, 150], lift: 1 },
     ] },
@@ -336,7 +337,7 @@ export const MORE = [
     id: 'marching', name: 'High Stepping', type: 'strength', mode: 'time', duration: 30,
     primary: ['hipFlexors'], secondary: ['quads', 'calves'],
     cues: ['March in place, lifting your knees high.', 'Swing your opposite arm with each step.', 'Stand tall and keep your core engaged.', 'Land softly.'],
-    anim: { anchor: 'hip', dur: 0.5, hold: 0.1, frames: [
+    anim: { anchor: 'hip', steady: true, dur: 0.5, hold: 0.1, frames: [
       { t: 0, aL: [140, 70], aR: [205, 150], lR: [110, 185, 120], lL: [180, 180] },
       { t: 0, aR: [140, 70], aL: [205, 150], lL: [110, 185, 120], lR: [180, 180] },
     ] },

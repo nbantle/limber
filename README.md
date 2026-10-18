@@ -1,6 +1,6 @@
 # Limber
 
-A guided stretching and calisthenics web app for iPhone. Build custom routines, then follow them step by step with timers, voice cues, animated technique demos, and muscle maps.
+A guided stretching, calisthenics, and free-weights web app for iPhone. Build custom routines, then follow them step by step with timers, voice cues, animated technique demos, and muscle maps.
 
 - **Use it:** open the site in Safari → Share → **Add to Home Screen**.
 - **Data:** stored on the device (localStorage). Use Settings → Export backup to move it.
@@ -8,8 +8,9 @@ A guided stretching and calisthenics web app for iPhone. Build custom routines, 
 
 ## Code
 Plain HTML/CSS/JS, no build step.
-- `js/exercises.js` — exercise library (cues, muscles, animation keyframes) and starter routines
+- `js/exercises.js` — exercise library (cues, muscles, animation keyframes) and starter routines; more in `js/exercises-more.js` and `js/exercises-weights.js`
 - `js/figure.js` — animated figure renderer (poses are absolute joint angles; see header comment)
 - `js/muscles.js` — front/back muscle map
 - `js/app.js` — routines, editor, library, player, history, settings
 - `dev/figures.html` — grid of every exercise animation for tuning poses (`python3 dev/serve.py .`)
+- `dev/frames.html` — each animation sampled at several moments, to catch glitches between keyframes
