@@ -196,6 +196,57 @@ function menu(items) {
   };
 }
 
+// ───────────────────────── Chip rows ─────────────────────────
+
+// Lists of choice chips (".fill") stretch so every row runs edge to edge; ".pack" lists are also reordered
+// (widest first, each into the first row with room) when that saves a row. data-pin="start"/"end" chips keep
+// their place. A lone chip on the last row keeps its natural width instead of stretching across.
+function fitChips(box) {
+  const chips = [...box.children];
+  const W = box.clientWidth;
+  if (!W || !chips.length) return;
+  box.classList.add('measuring');
+  const gap = parseFloat(getComputedStyle(box).columnGap) || 0;
+  const w = new Map(chips.map((c) => [c, c.getBoundingClientRect().width]));
+  box.classList.remove('measuring');
+  const rowCount = (list) => {
+    let n = 0, used = Infinity;
+    for (const c of list) { if (used + gap + w.get(c) > W) { n++; used = w.get(c); } else used += gap + w.get(c); }
+    return n;
+  };
+  let order = chips;
+  if (box.classList.contains('pack')) {
+    const start = chips.filter((c) => c.dataset.pin === 'start'), end = chips.filter((c) => c.dataset.pin === 'end');
+    const free = chips.filter((c) => !c.dataset.pin).sort((a, b) => w.get(b) - w.get(a));
+    const rows = [];
+    const place = (c) => {
+      const row = rows.find((r) => r.used + gap + w.get(c) <= W) ?? (rows.push({ items: [], used: -gap }), rows.at(-1));
+      row.items.push(c); row.used += gap + w.get(c);
+    };
+    start.forEach(place);
+    free.forEach(place);
+    // Keep each row's chips in their original order so related ones stay near each other.
+    const packed = [...rows.flatMap((r) => r.items.sort((a, b) => !!b.dataset.pin - !!a.dataset.pin || chips.indexOf(a) - chips.indexOf(b))), ...end];
+    if (rowCount(packed) < rowCount(chips)) order = packed;
+  }
+  // Lay the rows out; if one chip would sit alone at the end, bring the previous row's last chip down with it.
+  const rows = [];
+  let used = Infinity;
+  for (const c of order) {
+    if (used + gap + w.get(c) > W) { rows.push([]); used = -gap; }
+    used += gap + w.get(c); rows.at(-1).push(c);
+  }
+  const last = rows.at(-1), prev = rows.at(-2);
+  let breakAt = -1;
+  if (prev && last.length === 1 && prev.length >= 3) breakAt = order.indexOf(prev.at(-1));
+  box.querySelector('.row-break')?.remove();
+  order.forEach((c, i) => { c.style.order = i * 2; });
+  if (breakAt >= 0) box.insertAdjacentHTML('beforeend', `<span class="row-break" style="order:${breakAt * 2 - 1}"></span>`);
+  else if (prev && last.length === 1) last[0].classList.add('short-row');
+}
+new MutationObserver(() => $$('.fill:not([data-fit])').forEach((b) => { b.dataset.fit = '1'; fitChips(b); }))
+  .observe(document.body, { childList: true, subtree: true });
+
 // ───────────────────────── Feedback ─────────────────────────
 
 // Feedback goes out as an email from the tester's own mail app, with what they were looking at attached.
@@ -384,9 +435,9 @@ let exploreQuery = '', exploreSort = 'recommended';
 
 const GEAR = ['No equipment', 'Dumbbells', 'Kettlebell', 'Barbell', 'Bands', 'Pull-up bar', 'Chair or bench'];
 const EXPLORE_FILTERS = [
-  { key: 'goal', label: 'Goal', options: GOALS.map((g) => [g, g]) },
+  { key: 'goal', label: 'Goal', pack: true, options: GOALS.map((g) => [g, g]) },
   { key: 'len', label: 'Length', options: [['short', 'Under 10 min'], ['mid', '10–20 min'], ['long', '20–40 min'], ['xl', '40+ min']] },
-  { key: 'gear', label: 'Equipment', options: GEAR.map((g) => [g, g]) },
+  { key: 'gear', label: 'Equipment', pack: true, options: GEAR.map((g) => [g, g]) },
   { key: 'level', label: 'Level', options: LEVELS.map((l) => [l, l]) },
 ];
 const SORTS = [['recommended', 'Recommended'], ['short', 'Shortest first'], ['long', 'Longest first'], ['easy', 'Easiest first'], ['name', 'A–Z']];
@@ -799,8 +850,8 @@ function pickExercises(routine, onDone) {
 // state: { open, [group key]: value | 'all' }; groups: [{ key, label, options: [[value, label], ...] }].
 
 const EX_FILTERS = [
-  { key: 'type', label: 'Type', options: Object.entries(TYPES).map(([k, t]) => [k, t.plural]) },
-  { key: 'area', label: 'Body area', options: Object.entries(AREAS).map(([k, a]) => [k, a.label]) },
+  { key: 'type', label: 'Type', pack: true, options: Object.entries(TYPES).map(([k, t]) => [k, t.plural]) },
+  { key: 'area', label: 'Body area', pack: true, options: Object.entries(AREAS).map(([k, a]) => [k, a.label]) },
 ];
 
 function filterBar(state, groups, count = '', extra = '') {
@@ -813,7 +864,7 @@ function filterBar(state, groups, count = '', extra = '') {
       ${extra}
       <button class="chip more ${state.open ? 'open' : ''}" data-fb="toggle" aria-expanded="${state.open}">${icon('filter', 'inline')} ${state.open ? 'Hide filters' : 'Filters'}</button>
     </div>
-    ${state.open ? `<div class="fpanel">${groups.map((g) => `<div class="fgroup"><span class="fgroup-l">${g.label}</span><div class="chips wrap">${[['all', 'Any'], ...g.options].map(([v, l]) => `<button class="chip ${state[g.key] === v ? 'on' : ''}" data-fb-set="${g.key}" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`).join('')}</div>` : ''}`;
+    ${state.open ? `<div class="fpanel">${groups.map((g) => `<div class="fgroup"><span class="fgroup-l">${g.label}</span><div class="chips wrap fill ${g.pack ? 'pack' : ''}">${[['all', 'Any'], ...g.options].map(([v, l]) => `<button class="chip ${state[g.key] === v ? 'on' : ''}" ${v === 'all' ? 'data-pin="start"' : ''} data-fb-set="${g.key}" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`).join('')}</div>` : ''}`;
 }
 
 // Applies a click inside a filter bar to state. Returns true if it was a filter click.
@@ -1028,8 +1079,8 @@ function viewCoach() {
         <div class="msg ${m.from}">${m.html}</div>
         ${m.result && i === resultIdx ? coachResultCard() : ''}
         ${m.result && i === resultIdx && m.matches?.length ? `<div class="msg coach">You might also like these ready-made routines:</div><div class="coach-matches">${m.matches.map((id) => { const x = EXPLORE.find((r) => r.id === id); return `<a class="xrow" href="#/explore/${x.id}"><span class="x-text"><b>${esc(x.name)}</b><span class="x-meta">${typeDots(x.steps)}<span>${x.level} · ~${fmtMin(estimate(x))}</span></span></span>${icon('back', 'x-chev')}</a>`; }).join('')}</div>` : ''}
-        ${i === last && m.chips?.length ? `<div class="chips quick">${m.chips.map((c) => `<button class="chip" data-say="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
-        ${i === last && m.gear ? `<div class="chips quick">${coachBrain.GEAR_CHOICES.map((g) => `<button class="chip ${coachChat.picked.includes(g) ? 'on' : ''}" data-gear="${g}">${g}</button>`).join('')}<button class="chip" data-say="No equipment">No equipment</button><button class="chip done" data-act="gear-done" ${coachChat.picked.length ? '' : 'disabled'}>Done</button></div>` : ''}
+        ${i === last && m.chips?.length ? `<div class="chips quick fill ${m.chips === coachBrain.STARTERS ? 'pack' : ''}">${m.chips.map((c) => `<button class="chip" data-say="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
+        ${i === last && m.gear ? `<div class="chips quick fill pack">${coachBrain.GEAR_CHOICES.map((g) => `<button class="chip ${coachChat.picked.includes(g) ? 'on' : ''}" data-gear="${g}">${g}</button>`).join('')}<button class="chip" data-pin="end" data-say="No equipment">No equipment</button><button class="chip done" data-pin="end" data-act="gear-done" ${coachChat.picked.length ? '' : 'disabled'}>Done</button></div>` : ''}
       `).join('')}</div>
       <form class="chat-input" autocomplete="off"><input name="q" placeholder="Describe what you need…" aria-label="Message the Coach" enterkeyhint="send"><button class="btn-icon accent" aria-label="Send">${icon('send')}</button></form>`;
     $$('.chat .step-thumb', app).forEach((el) => figs.push(renderFigure(el, getEx(el.dataset.ex), { animate: false, aspect: 1.15, arrows: false })));
@@ -1217,8 +1268,8 @@ function viewCustomEditor(id) {
         <label>Default reps<input name="reps" type="number" inputmode="numeric" min="1" max="200" value="${c.reps}"></label>
       </div>
       <label class="switch-row"><span>Done on each side</span><button type="button" class="toggle ${c.sided ? 'on' : ''}" data-toggle="sided" role="switch" aria-checked="${c.sided}"><span></span></button></label>
-      <fieldset><legend>Primary muscles</legend><div class="chips wrap">${muscleChips('primary')}</div></fieldset>
-      <fieldset><legend>Also works</legend><div class="chips wrap">${muscleChips('secondary')}</div></fieldset>
+      <fieldset><legend>Primary muscles</legend><div class="chips wrap fill pack">${muscleChips('primary')}</div></fieldset>
+      <fieldset><legend>Also works</legend><div class="chips wrap fill pack">${muscleChips('secondary')}</div></fieldset>
       <label>Technique cues <span class="muted">(one per line)</span><textarea name="cues" rows="4" placeholder="Keep your back flat&#10;Breathe slowly">${esc(c.cues.join('\n'))}</textarea></label>
       <label>Animation — looks most like
         <select name="like">${EXERCISES.map((e) => `<option value="${e.id}" ${e.id === c.like ? 'selected' : ''}>${esc(e.name)}</option>`).join('')}</select>
@@ -1658,7 +1709,7 @@ function viewPlayer(id) {
     pause();
     const isBand = p.band !== null;
     const body = () => (isBand
-      ? `<div class="load-pick">${BAND_LEVELS.map((l, i) => `<button class="chip ${i === p.band ? 'on' : ''}" data-band="${i}">${bandDot(i)}${l}</button>`).join('')}</div>`
+      ? `<div class="load-pick fill">${BAND_LEVELS.map((l, i) => `<button class="chip ${i === p.band ? 'on' : ''}" data-band="${i}">${bandDot(i)}${l}</button>`).join('')}</div>`
       : `<div class="load-row">${stepper('weight', p.weight, weightInc(), 0, S.units === 'kg' ? 500 : 1000, S.units)}</div>`);
     const s = sheet(`<div class="sheet-head"><h3>${esc(p.ex.name)}</h3><button class="btn small primary" data-act="ok">Done</button></div><p class="muted small">Changes this exercise in “${esc(r.name)}” too.</p><div class="load-body">${body()}</div>`,
       { onClose: () => { save(); workChips(phase()); if (!wasPaused) resume(); } });

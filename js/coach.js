@@ -57,7 +57,7 @@ export function understand(text) {
 }
 
 // Quick-reply starting points (each is just text the user could have typed).
-export const STARTERS = ['My lower back hurts', 'Tight hips from sitting', 'Neck & shoulder tension', 'I want to get stronger', 'Cardio to lose weight', 'Better posture', 'More flexible', 'Help me wind down for sleep', 'Strength for running', 'Stronger core'];
+export const STARTERS = ['Lower back pain', 'Hip tightness', 'Neck & shoulders', 'Get stronger', 'Lose weight', 'Better posture', 'More flexible', 'Sleep & stress', 'Running strength', 'Stronger core'];
 
 // ───────────── Building the routine ─────────────
 
