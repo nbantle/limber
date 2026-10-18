@@ -123,9 +123,9 @@ export const EXERCISES = [
     id: 'butterfly', name: 'Butterfly Stretch', type: 'stretch', mode: 'time', duration: 30,
     primary: ['adductors'], secondary: ['hipFlexors', 'glutes'],
     cues: ['Sit with the soles of your feet together, knees out to the sides.', 'Hold your feet and sit up tall.', 'Let your knees relax toward the floor — don\'t push them down.', 'For more stretch, hinge forward with a long back.'],
-    anim: { arrow: 'kneeL', view: 'front', anchor: 'hip', dur: 2.6, frames: [
-      { t: 0, aL: [178, 172], aR: [182, 188], lL: [252, 108], lR: [108, 252] },
-      { t: 0, aL: [178, 172], aR: [182, 188], lL: [262, 100], lR: [98, 260] },
+    anim: { arrow: 'kneeL', view: 'front', anchor: 'hip', legsFront: true, dur: 2.6, frames: [
+      { t: 0, aL: [176, 168], aR: [184, 192], lL: [292, 114], lR: [68, 246], kth: 0.9, ksh: 0.9 },
+      { t: 0, aL: [176, 168], aR: [184, 192], lL: [284, 106], lR: [76, 254], kth: 0.9, ksh: 0.9 },
     ] },
   },
   {
@@ -133,8 +133,8 @@ export const EXERCISES = [
     primary: ['lats', 'lowerBack'], secondary: ['glutes', 'shoulders'],
     cues: ['Kneel, sit back toward your heels, and fold forward.', 'Reach your arms long in front of you on the floor.', 'Let your forehead rest on the floor.', 'Breathe into your back and let it widen.'],
     anim: { dur: 2.8, frames: [
-      { t: 98, h: 115, c: 3, aL: [92, 92], aR: [92, 92], lL: [100, 270, 270], lR: [100, 270, 270] },
-      { t: 95, h: 112, c: 4, aL: [88, 90], aR: [88, 90], lL: [100, 270, 270], lR: [100, 270, 270] },
+      { t: 99, h: 100, c: 3, aL: [106, 96], aR: [106, 96], lL: [109, 267, 270], lR: [109, 267, 270] },
+      { t: 97, h: 101, c: 4, aL: [104, 96], aR: [104, 96], lL: [109, 267, 270], lR: [109, 267, 270] },
     ] },
   },
   {

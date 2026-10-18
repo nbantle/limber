@@ -402,7 +402,9 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
     G(() => limb('L', true, true)); G(() => limb('L', true, false)); G(() => { torso(); }); G(() => limb('R', false, false));
     G(() => { neck(); head(); }); G(() => limb('R', false, true));
   } else {
-    G(() => { limb('L', false, false); limb('R', false, false); }); G(() => torso());
+    // Seated front poses (J.legsFront) have the knees toward the viewer, so the legs go over the torso.
+    if (J.legsFront && !back) { G(() => torso()); G(() => { limb('L', false, false); limb('R', false, false); }); }
+    else { G(() => { limb('L', false, false); limb('R', false, false); }); G(() => torso()); }
     if (back) { G(() => { neck(); head(); }); G(() => limb('L', false, true)); G(() => limb('R', false, true)); }
     else { G(() => limb('L', false, true)); G(() => limb('R', false, true)); G(() => { neck(); head(); }); }
   }

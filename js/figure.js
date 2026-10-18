@@ -14,6 +14,7 @@ import { C, mix } from './palette.js';
 // A leg's foot angle defaults to flat (side view) or turned out (front view). In side view a relaxed
 // foot sits at shin − 90; pointed toes approach the shin angle. Anything past the shin angle is backwards.
 // anim.top draws a lying figure seen from above (front view rules, no floor).
+// anim.legsFront (front view) draws the legs over the torso, for seated poses with the knees toward the viewer.
 // anim.steady keeps the anchor fixed between frames (e.g. hands on the floor while the legs swing).
 // anim.gear draws equipment in the hands: { kind: 'db' | 'kb' | 'bb', hands: 'LR' | 'R' | 'both', axis, at }.
 //   axis (dumbbells/barbells): 'end' = handle points at the viewer (drawn as a plate), 'perp' = across the
@@ -85,7 +86,8 @@ function segments(J, view) {
   const core = [{ ...S('torso', 'hip', 'neck', 'torso', false), c: J.c }, S('neck', 'neck', 'head', 'neck', false)];
   const L = limbs('L', view !== 'front');
   const R = limbs('R', false);
-  if (view === 'front') return [...L.leg, ...R.leg, ...core, ...L.arm, ...R.arm];
+  // Seated front views (butterfly) have the legs coming toward the viewer, so they draw over the torso.
+  if (view === 'front') return J.legsFront ? [...core, ...L.leg, ...R.leg, ...L.arm, ...R.arm] : [...L.leg, ...R.leg, ...core, ...L.arm, ...R.arm];
   return [...L.arm, ...L.leg, ...core, ...R.leg, ...R.arm];
 }
 
@@ -294,6 +296,7 @@ export function makeRig(anim) {
       dy = -Math.max(...pts.map((p) => p[1] + p[2])) - (pose.lift ?? 0);
     }
     for (const k in J) if (Array.isArray(J[k])) J[k] = [J[k][0] + dx, J[k][1] + dy];
+    if (anim.legsFront) J.legsFront = true;
     if (ref) {
       for (const p of plant) {
         const s = p.slice(-1);
