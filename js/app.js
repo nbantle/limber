@@ -1102,7 +1102,7 @@ function viewLibrary() {
       <span class="ex-sub">${esc(muscleNames(ex.primary))}</span>
       ${ex.custom ? '<span class="tag">Custom</span>' : ''}
     </a>`).join('') || '<p class="muted pad">No matches.</p>';
-    $$('.ex-thumb', grid).forEach((el) => figs.push(renderFigure(el, getEx(el.dataset.ex), { animate: false, aspect: 1.25 })));
+    $$('.ex-thumb', grid).forEach((el) => figs.push(renderFigure(el, getEx(el.dataset.ex), { animate: false, aspect: 1.5 })));
   };
   app.onclick = (e) => { if (filterClick(e, libState)) draw(); };
   $('.search input', app).addEventListener('input', (e) => { libQuery = e.target.value; draw(); });
