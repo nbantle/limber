@@ -26,7 +26,7 @@ import { C, mix } from './palette.js';
 //   a fixed point (at + dx/dy, from the first frame), 'knees' is a loop around the thighs. behind: draw it behind the body.
 
 const LEN = { torso: 24, shoulderAt: 21, neck: 2.5, headR: 5, ua: 12.5, fa: 12, th: 18, sh: 18, foot: 6, footFront: 3.2 };
-export const GLUTE = { r: 4.2, off: 1.4 }; // side-view seat: circle tucked behind the hip, between torso and thighs
+export const GLUTE = { r: 3.8, off: 1.2 }; // side-view seat: circle tucked behind the hip, between torso and thighs
 const WID = { torso: 10, neck: 3.6, ua: 4.7, fa: 3.6, th: 7.4, sh: 5.1, foot: 3.9 };
 const SVGNS = 'http://www.w3.org/2000/svg';
 

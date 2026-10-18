@@ -13,6 +13,16 @@ const norm = (v) => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v
 const shade = (hex, amt) => (amt > 0 ? mix(hex, C.charcoal, Math.min(1, amt * 1.15)) : mix(hex, C.white, -amt));
 
 // Smooth closed path through points (Catmull-Rom → cubic Bézier).
+// Convex hull (monotone chain), counter-clockwise.
+function hull(pts) {
+  const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const q of p) { while (lo.length > 1 && cross(lo.at(-2), lo.at(-1), q) <= 0) lo.pop(); lo.push(q); }
+  for (const q of p.reverse()) { while (up.length > 1 && cross(up.at(-2), up.at(-1), q) <= 0) up.pop(); up.push(q); }
+  return [...lo.slice(0, -1), ...up.slice(0, -1)];
+}
+
 function smooth(pts, open = false) {
   const n = pts.length;
   const P = (i) => (open ? pts[Math.max(0, Math.min(n - 1, i))] : pts[(i + n) % n]);
@@ -98,11 +108,11 @@ function midline(fr, prof, u0, u1, side, scale = 1) {
 const P = {
   thighSide: [[0, 3.7, 3.5], [0.25, 3.5, 3.7], [0.6, 3.0, 3.2], [0.88, 2.5, 2.6], [1, 2.4, 2.5]],
   shinSide: [[0, 2.4, 2.5], [0.22, 3.0, 2.2], [0.45, 2.7, 2.0], [0.8, 1.6, 1.5], [1, 1.4, 1.4]],
-  uarmSide: [[0, 2.6, 2.6], [0.25, 2.3, 2.2], [0.55, 2.0, 2.2], [1, 1.65, 1.65]],
+  uarmSide: [[0, 2.1, 2.1], [0.25, 2.2, 2.1], [0.55, 2.0, 2.15], [1, 1.65, 1.65]],
   farmSide: [[0, 1.7, 1.7], [0.3, 1.9, 1.7], [1, 1.15, 1.15]],
   thighFront: [[0, 2.7, 3.1], [0.18, 3.1, 3.0], [0.55, 2.8, 2.5], [1, 2.2, 2.1]],
   shinFront: [[0, 2.3, 2.3], [0.28, 2.8, 2.6], [0.6, 2.1, 1.9], [1, 1.35, 1.35]],
-  uarmFront: [[0, 2.7, 2.4], [0.3, 2.3, 2.0], [0.6, 2.1, 1.9], [1, 1.6, 1.6]],
+  uarmFront: [[0, 1.5, 1.4], [0.14, 2.05, 1.8], [0.35, 2.15, 1.9], [0.6, 2.05, 1.85], [1, 1.6, 1.6]],
   farmFront: [[0, 1.65, 1.6], [0.3, 1.8, 1.7], [1, 1.15, 1.1]],
   neck: [[0, 1.75, 1.75], [1, 1.5, 1.5]],
 };
@@ -111,8 +121,8 @@ const P = {
 const TORSO = {
   sideF: [[0, 3.4, 4.4], [0.1, 3.9, 5.0], [0.24, 3.8, 4.5], [0.38, 3.6, 4.0], [0.6, 4.3, 4.3], [0.74, 5.5, 4.6], [0.88, 4.4, 4.5], [1, 2.2, 2.6]],
   sideM: [[0, 3.5, 4.2], [0.1, 4.1, 4.8], [0.24, 4.0, 4.4], [0.38, 3.9, 4.1], [0.6, 4.5, 4.4], [0.74, 5.1, 4.8], [0.88, 4.5, 4.6], [1, 2.3, 2.7]],
-  frontF: [[-0.12, 3.2, 3.2], [0, 6.2, 6.2], [0.16, 6.3, 6.3], [0.4, 4.9, 4.9], [0.62, 5.4, 5.4], [0.8, 6.2, 6.2], [0.9, 6.4, 6.4], [0.97, 4.4, 4.4], [1, 2.2, 2.2]],
-  frontM: [[-0.12, 3.4, 3.4], [0, 6.0, 6.0], [0.16, 5.9, 5.9], [0.4, 5.5, 5.5], [0.62, 6.0, 6.0], [0.8, 6.7, 6.7], [0.9, 6.8, 6.8], [0.97, 4.8, 4.8], [1, 2.4, 2.4]],
+  frontF: [[-0.12, 3.2, 3.2], [0, 6.2, 6.2], [0.16, 6.3, 6.3], [0.4, 4.9, 4.9], [0.62, 5.4, 5.4], [0.8, 6.3, 6.3], [0.88, 6.9, 6.9], [0.95, 5.2, 5.2], [1, 2.2, 2.2]],
+  frontM: [[-0.12, 3.4, 3.4], [0, 6.0, 6.0], [0.16, 5.9, 5.9], [0.4, 5.5, 5.5], [0.62, 6.0, 6.0], [0.8, 6.8, 6.8], [0.88, 7.3, 7.3], [0.95, 5.6, 5.6], [1, 2.4, 2.4]],
 };
 
 // Muscle → [segment kind, from, to, side ('front' | 'back' | 'both')].
@@ -161,13 +171,13 @@ export const STYLES = {
 
 const HL = C.coral; // worked-muscle highlight
 const LIPS = mix(C.coral, C.charcoal, 0.35);
-const GLUTE_R = 4.2; // matches GLUTE.r in figure.js
+const GLUTE_R = 3.8; // matches GLUTE.r in figure.js
 
 // App-facing look: which coach and skin tone the Studio character uses.
 export const COACHES = { a: { label: 'Ava', person: 'ava' }, b: { label: 'Max', person: 'max' } };
 export const SKINS = ['#f7d5b8', '#eab38e', '#c68a62', '#8b5a3c'];
 // Face options (ear: 'current' | 'a' | 'b' | 'c'; hair: 'classic' | 'real'). setFace is only used by dev demos.
-const FACE = { ear: 'current', hair: 'classic', blush: true };
+const FACE = { ear: 'a', hair: 'real', blush: false, nose: 'soft' };
 export function setFace(opts) { Object.assign(FACE, opts); }
 
 let look = { person: 'ava', skin: SKINS[1] };
@@ -218,7 +228,7 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       const base = who.mono ? skin : skin;
       push(part(f2, p2, 0, 1, { scale: sc }), far(base, isFar));
       push(part(f1, p1, 0, 1, { scale: sc }), far(base, isFar));
-      if (!who.mono && !fem) push(part(f1, p1, 0, 0.44, { grow: 0.3, capB: false, scale: sc }), far(who.top, isFar));
+      if (!who.mono && !fem) push(part(f1, p1, 0, 0.42, { grow: side ? 0.15 : 0.05, capB: false, scale: sc }), far(who.top, isFar));
       hand(s, isFar);
     } else {
       const legCol = who.mono ? skin : fem ? who.bottom : skin;
@@ -279,9 +289,17 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
   };
 
   // Side-view seat: a round glute behind the hip (see GLUTE in figure.js).
+  // It's wrapped in a hull with the back of the torso and thigh so it blends in instead of bulging out.
   const seat = (grow = 0) => {
-    const c = J.glute, r = GLUTE_R * sc + grow;
-    return smooth(Array.from({ length: 12 }, (_, i) => [c[0] + Math.cos((i / 12) * 2 * Math.PI) * r, c[1] + Math.sin((i / 12) * 2 * Math.PI) * r]));
+    const c = J.glute, r = GLUTE_R * sc + grow, H = J.hip;
+    const pts = Array.from({ length: 16 }, (_, i) => [c[0] + Math.cos((i / 16) * 2 * Math.PI) * r, c[1] + Math.sin((i / 16) * 2 * Math.PI) * r]);
+    const toward = (to, along, w) => {
+      const T = norm([to[0] - H[0], to[1] - H[1]]); let N = [-T[1], T[0]];
+      if (N[0] * (c[0] - H[0]) + N[1] * (c[1] - H[1]) < 0) N = [-N[0], -N[1]];
+      return [H[0] + T[0] * along + N[0] * (w + grow), H[1] + T[1] * along + N[1] * (w + grow)];
+    };
+    pts.push(toward(J.neck, 3.2 * sc, 3.9 * sc), toward(J.kneeR, 5.5 * sc, 3.2 * sc), toward(J.kneeL, 5.5 * sc, 3.2 * sc));
+    return smooth(hull(pts));
   };
   const torso = () => {
     const fr = frame(J, 'hip', 'neck', true);
@@ -344,6 +362,7 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       return;
     }
     const tn = Math.max(-1, Math.min(1, J.turn ?? 0)) * 0.4;
+    let tie = null;
     const real = FACE.hair === 'real';
     const hairHi = shade(who.hair, -0.2), hairLo = shade(who.hair, 0.35), fade = mix(who.hair, skin, 0.42);
     // Ear: x is the ear's centre across the face (side view: 0 = middle of the head), m mirrors it.
@@ -381,6 +400,7 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
         const T = [p0, p1, p2, p3, p4].map((p, i) => (floor ? [p[0], Math.min(p[1], -rads[i] * R - 0.15)] : p));
         const fr = { at: (u) => { const i = Math.min(3, Math.floor(u * 4)); const k = u * 4 - i; return [T[i][0] + (T[i + 1][0] - T[i][0]) * k, T[i][1] + (T[i + 1][1] - T[i][1]) * k]; }, tan: (u) => { const i = Math.min(3, Math.floor(u * 4)); return norm([T[i + 1][0] - T[i][0], T[i + 1][1] - T[i][1]]); } };
         push(part(fr, rads.map((r, i) => [i / 4, r * R, r * R]), 0, 1), who.hair);
+        { const c = fr.at(0.12), t = fr.tan(0.12), n = [-t[1], t[0]], w = rads[0] * 0.95 * R; tie = [add(c, n, w), add(c, t, 0.12 * R), add(c, n, -w)]; }
         if (real) {
           // Strands down the tail: one lighter sheen, one darker groove.
           for (const [off, col, w] of [[0.12, hairHi, 0.05], [-0.14, hairLo, 0.045]]) {
@@ -390,7 +410,8 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
         }
       }
       // Skull + face profile (jaw, nose, chin).
-      poly([[-0.92, 0.1], [-0.72, 0.72], [-0.1, 1.0], [0.55, 0.82], [0.86, 0.35], [0.9, 0.05], [1.06, -0.12], [0.88, -0.22], [0.86, -0.5], [0.66, -0.72], [0.38, -0.86], [-0.05, -0.8], [-0.45, -0.72], [-0.82, -0.4]], skin);
+      const nose = FACE.nose === 'soft' ? [[0.88, 0.06], [0.95, -0.04], [0.99, -0.13], [0.95, -0.2], [0.87, -0.24]] : [[0.9, 0.05], [1.06, -0.12], [0.88, -0.22]];
+      poly([[-0.92, 0.1], [-0.72, 0.72], [-0.1, 1.0], [0.55, 0.82], [0.86, 0.35], ...nose, [0.86, -0.5], [0.66, -0.72], [0.38, -0.86], [-0.05, -0.8], [-0.45, -0.72], [-0.82, -0.4]], skin);
       // Hair.
       if (!real) {
         if (fem) poly([[0.62, 0.62], [0.2, 1.04], [-0.55, 0.92], [-1.0, 0.35], [-0.98, -0.3], [-0.72, -0.62], [-0.42, -0.2], [-0.22, 0.3], [0.2, 0.46]], who.hair);
@@ -402,14 +423,18 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
         line([[0.3, 0.5], [-0.15, 0.62], [-0.6, 0.6]], hairLo, 0.03, { opacity: 0.6 });
         line([[-0.1, 0.4], [-0.45, 0.46], [-0.7, 0.58]], hairHi, 0.03, { opacity: 0.5 });
       } else {
-        // Short textured crop: fuller on top, faded above and behind the ear, short sideburn.
-        // Faded back and sides first, then the fuller top over it.
-        poly([[0.66, 0.6], [0.3, 1.04], [-0.4, 1.04], [-0.9, 0.66], [-0.98, 0.2], [-0.92, -0.26], [-0.72, -0.46], [-0.46, -0.3], [-0.38, 0.02], [-0.28, 0.22], [-0.08, 0.28], [0.02, 0.04], [0.1, 0.06], [0.14, 0.34], [0.4, 0.48]], fade);
-        poly([[0.7, 0.58], [0.62, 0.76], [0.66, 0.84], [0.42, 1.04], [0.0, 1.12], [-0.45, 1.06], [-0.86, 0.76], [-0.96, 0.42], [-0.6, 0.4], [-0.2, 0.42], [0.1, 0.48], [0.38, 0.52]], who.hair);
-        line([[0.55, 0.76], [0.2, 0.96], [-0.25, 0.98]], hairHi, 0.035, { opacity: 0.7 });
-        line([[0.3, 0.64], [-0.05, 0.8], [-0.5, 0.82]], hairLo, 0.03, { opacity: 0.6 });
+        // Short textured crop: one colour, fuller on top, tapered at the back and sideburn, light accents for shape.
+        poly([[0.7, 0.58], [0.62, 0.76], [0.66, 0.84], [0.42, 1.06], [0.0, 1.12], [-0.45, 1.06], [-0.88, 0.74], [-0.98, 0.24], [-0.92, -0.26], [-0.72, -0.46], [-0.46, -0.3], [-0.38, 0.02], [-0.28, 0.22], [-0.08, 0.28], [0.02, 0.04], [0.1, 0.06], [0.14, 0.34], [0.4, 0.5]], who.hair);
+        line([[0.55, 0.78], [0.2, 0.98], [-0.25, 1.0]], hairHi, 0.035, { opacity: 0.75 });
+        line([[0.3, 0.66], [-0.05, 0.82], [-0.5, 0.84]], hairHi, 0.03, { opacity: 0.45 });
+        line([[-0.62, 0.62], [-0.82, 0.3], [-0.82, -0.05]], hairHi, 0.03, { opacity: 0.4 });
       }
-      if (fem) ell(Q(-0.72, 0.72), 0.14, 0.16, who.tie);
+      if (tie) {
+        // Hair tie: a band in the shirt colour wrapped across the base of the ponytail.
+        const [a, m, b] = tie, d = `M${f(a[0])} ${f(a[1])}Q${f(m[0])} ${f(m[1])} ${f(b[0])} ${f(b[1])}`;
+        ops.push({ tag: 'path', d, stroke: who.top, 'stroke-width': 0.17 * R, 'stroke-linecap': 'round', fill: 'none' });
+        ops.push({ tag: 'path', d, stroke: shade(who.top, 0.3), 'stroke-width': 0.05 * R, 'stroke-linecap': 'round', fill: 'none', opacity: 0.55 });
+      }
       ear(-0.2, -0.05, 1, true);
       if (S.face !== 'none') {
         ell(Q(0.56, 0.1), S.face === 'simple' ? 0.11 : 0.09, S.face === 'simple' ? 0.11 : 0.13, C.charcoal, { opacity: 1 });
@@ -424,7 +449,7 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       if (fem) {
         poly([[-0.88, 0.1], [-0.6, 0.85], [0, 1.06], [0.6, 0.85], [0.88, 0.1], [0.75, -0.6], [0, -0.85], [-0.75, -0.6]], who.hair);
         poly([[-0.3, 0.5], [0.3, 0.5], [0.42, -0.4], [0.25, -1.3], [0, -1.6], [-0.25, -1.3], [-0.42, -0.4]], shade(who.hair, -0.06));
-        ell(Q(0, 0.52), 0.24, 0.14, who.tie);
+        line([[-0.26, 0.54], [0, 0.5], [0.26, 0.54]], who.top, 0.16);
       } else poly([[-0.9, 0.1], [-0.65, 0.85], [0, 1.05], [0.65, 0.85], [0.9, 0.1], [0.78, -0.45], [0, -0.62], [-0.78, -0.45]], who.hair);
       return;
     }
@@ -446,7 +471,7 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       line([[-0.8, 0.2], [-0.84, -0.12]], who.hair, 0.04, { opacity: 0.9 }); // loose wisp at the temple
     } else {
       // Short textured crop: soft uneven fringe, faded sides down to the ears.
-      for (const m of [-1, 1]) poly([[0.88 * m, 0.46], [0.9 * m, 0.04], [0.84 * m, -0.06], [0.8 * m, 0.2], [0.76 * m, 0.46]], fade);
+      for (const m of [-1, 1]) poly([[0.88 * m, 0.46], [0.9 * m, 0.04], [0.84 * m, -0.06], [0.8 * m, 0.2], [0.76 * m, 0.46]], who.hair);
       poly([[-0.9, 0.34], [-0.84, 0.78], [-0.5, 1.04], [0, 1.14], [0.5, 1.04], [0.84, 0.78], [0.9, 0.34], [0.76, 0.5], [0.56, 0.6], [0.42, 0.57], [0.24, 0.63], [0.06, 0.59], [-0.14, 0.64], [-0.34, 0.6], [-0.56, 0.62], [-0.76, 0.5]].map(([a, b]) => [a + tn * 0.1, b]), who.hair);
       line([[-0.5, 0.9], [-0.1, 1.02], [0.36, 0.96]].map(([a, b]) => [a + tn * 0.1, b]), hairHi, 0.035, { opacity: 0.7 });
       line([[-0.3, 0.76], [0.05, 0.84], [0.5, 0.78]].map(([a, b]) => [a + tn * 0.1, b]), hairLo, 0.03, { opacity: 0.6 });

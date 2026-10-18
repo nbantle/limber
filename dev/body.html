@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>Body check</title><link rel="stylesheet" href="../styles.css">
+<style>body{font:700 14px -apple-system,system-ui;background:#fff;color:#1f242c;margin:10px;min-height:0}
+.grid{display:grid;grid-template-columns:repeat(6,300px);gap:8px}.cell{background:#f1f4f8;border-radius:12px;height:340px;position:relative}
+.cell span{position:absolute;left:8px;top:6px;font-size:12px}.cell svg{width:100%;height:100%;display:block}</style>
+<div class=grid id=g></div>
+<script type=module>
+import { EXERCISES } from '../js/exercises.js'; import { renderFigure } from '../js/figure.js'; import * as ch from '../js/character2.js'; const { setLook } = ch, setFace = (o) => ch.setFace?.(o);
+const q = new URLSearchParams(location.search);
+setFace(JSON.parse(q.get('face') || '{}'));
+const ids = (q.get('ids') || 'db-shrug,calf-raises,squat,glute-bridge,seated-forward-fold,bb-deadlift').split(',');
+const g = document.getElementById('g');
+for (const coach of ['b', 'a']) for (const id of ids) {
+  const c = document.createElement('div'); c.className = 'cell'; c.innerHTML = `<span>${id}</span>`; g.append(c);
+  setLook(coach, 1);
+  renderFigure(c, EXERCISES.find((e) => e.id === id), { animate: false, arrows: false, highlight: false, frame: +(q.get('f') || 0) });
+}
+</script>
