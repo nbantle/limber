@@ -178,6 +178,13 @@ body.playing .tabbar { display: none; }
 .sheet .fpanel .chip:not(.on) { background: var(--surface); }.lib-count { margin: 0 2px 8px; }
 
 /* ── Home: My routines + Explore ── */
+.home-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 2px 0 14px; }
+.home-tabs button {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border-radius: 99px;
+  font-weight: 700; font-size: 15.5px; background: var(--surface-2); color: var(--text-2); transition: background .2s, color .2s;
+}
+.home-tabs button span { font-size: 12.5px; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: color-mix(in srgb, currentColor 14%, transparent); }
+.home-tabs button.on { background: var(--stretch); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--stretch) 35%, transparent); }
 .sec-head { display: flex; align-items: baseline; gap: 8px; margin: 18px 2px 8px; }
 .sec-head h2 { font-size: 20px; font-weight: 800; }
 .rlist { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }

@@ -293,6 +293,8 @@ function updateTabs(tab) {
 const isStandalone = isStandaloneApp;
 
 // Home: My routines (compact rows) and Explore — ready-made routines with search, filters and sort.
+// Which half of the home screen is showing: 'mine' or 'explore' (remembered between visits).
+let homeView = (() => { try { return localStorage.getItem('limber.homeView') === 'explore' ? 'explore' : 'mine'; } catch { return 'mine'; } })();
 const exploreState = { open: false, goal: 'all', len: 'all', gear: 'all', level: 'all' };
 let exploreQuery = '', exploreSort = 'recommended';
 
@@ -360,25 +362,28 @@ function viewRoutines() {
     $$('.x-thumb', app).forEach((el) => figs.push(renderFigure(el, getEx(el.dataset.ex), { animate: false, aspect: 1.15, arrows: false })));
   };
   const draw = () => {
+    const mine = homeView === 'mine' || sorting;
     app.innerHTML = `
       <header class="top">
         <h1>Routines</h1>
         <div class="top-actions">
-          ${db.routines.length > 1 ? (sorting
+          ${mine && db.routines.length > 1 ? (sorting
             ? '<button class="btn small primary" data-act="sort">Done</button>'
             : `<button class="btn-icon" data-act="sort" aria-label="Reorder routines">${icon('sort')}</button>`) : ''}
           ${sorting ? '' : `<button class="btn-icon accent" data-act="new" aria-label="New routine">${icon('plus')}</button>`}
         </div>
       </header>
+      ${sorting ? '' : `<div class="home-tabs" role="tablist" aria-label="Routines view">
+        <button role="tab" data-view="mine" class="${mine ? 'on' : ''}" aria-selected="${mine}">My routines <span>${db.routines.length}</span></button>
+        <button role="tab" data-view="explore" class="${mine ? '' : 'on'}" aria-selected="${!mine}">Explore <span>${EXPLORE.length}</span></button>
+      </div>`}
       ${showHint && !sorting ? `<div class="hint"><div><strong>Install Limber</strong><p>Tap the Share button ${icon('share', 'inline')} then <b>Add to Home Screen</b> to use it like an app. Routines you make in the installed app stay there.</p></div><button class="btn-icon" data-act="hint" aria-label="Dismiss">${icon('close')}</button></div>` : ''}
       ${sorting ? '<p class="muted small sort-tip">Drag the handles to reorder.</p>' : workoutDayNudge()}
-      <div class="sec-head"><h2>My routines</h2><span class="muted small">${db.routines.length}</span></div>
+      ${mine ? `
       <div class="rlist ${sorting ? 'sorting-mode' : ''}">
-        ${db.routines.length ? db.routines.map((r) => routineCard(r, sorting)).join('') : `<div class="empty small"><p>No routines yet. Make your own, or add one from Explore below.</p><button class="btn primary small" data-act="new">Create a routine</button></div>`}
-      </div>
-      ${sorting ? '' : `
+        ${db.routines.length ? db.routines.map((r) => routineCard(r, sorting)).join('') : `<div class="empty small"><p>No routines yet. Make your own, or pick one from Explore.</p><button class="btn primary small" data-act="new">Create a routine</button></div>`}
+      </div>` : `
       <section class="explore">
-        <div class="sec-head"><h2>Explore</h2><span class="muted small">${EXPLORE.length} routines</span></div>
         <div class="search">${icon('search')}<input type="search" placeholder="Search routines or exercises" value="${esc(exploreQuery)}" aria-label="Search routines"></div>
         <div class="fwrap"></div>
         <div class="x-tools"><span class="x-count muted small"></span>
@@ -387,8 +392,8 @@ function viewRoutines() {
         <div class="xlist"></div>
       </section>`}
     `;
-    sortable($('.rlist', app), '.rrow', (from, to) => { move(db.routines, from, to); save(); draw(); });
-    if (!sorting) {
+    if (mine) sortable($('.rlist', app), '.rrow', (from, to) => { move(db.routines, from, to); save(); draw(); });
+    else {
       drawExplore();
       $('.explore input', app).addEventListener('input', (e) => { exploreQuery = e.target.value; drawExplore(); });
       $('.explore select', app).addEventListener('change', (e) => { exploreSort = e.target.value; drawExplore(); });
@@ -397,6 +402,13 @@ function viewRoutines() {
   draw();
   app.onclick = (e) => {
     if (filterClick(e, exploreState)) { drawExplore(); return; }
+    const v = e.target.closest('[data-view]');
+    if (v && v.dataset.view !== homeView) {
+      homeView = v.dataset.view;
+      try { localStorage.setItem('limber.homeView', homeView); } catch { /* ignore */ }
+      draw(); window.scrollTo(0, 0);
+      return;
+    }
     const t = e.target.closest('[data-act]');
     if (!t) return;
     const id = t.closest('[data-id]')?.dataset.id;
