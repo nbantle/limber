@@ -1,5 +1,6 @@
 import { EXERCISES, STARTER_ROUTINES, MUSCLES, AREAS } from './exercises.js';
 import { EXPLORE, GOALS, LEVELS } from './routines.js';
+import * as coachBrain from './coach.js';
 import { renderFigure, BAND_COLORS } from './figure.js';
 import { COACHES, SKINS, setLook } from './character2.js';
 import { muscleMapSVG } from './muscles.js';
@@ -147,6 +148,9 @@ const ICONS = {
   grip: '<circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
   sort: '<path d="M7 4v16M3.5 7.5L7 4l3.5 3.5M17 20V4M13.5 16.5L17 20l3.5-3.5"/>',
   filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
+  chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
+  send: '<path d="M4 12l16-8-6 16-2.5-6.5z"/>',
+  spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17A8.5 8.5 0 0 0 12 3.5z" fill="currentColor"/>',
@@ -261,6 +265,7 @@ const routes = [
   [/^#\/play\/([\w-]+)$/, viewPlayer],
   [/^#\/import\/(.+)$/, viewImport],
   [/^#\/explore\/([\w-]+)$/, viewExplore],
+  [/^#\/coach$/, viewCoach],
 ];
 
 function render() {
@@ -370,6 +375,7 @@ function viewRoutines() {
           ${mine && db.routines.length > 1 ? (sorting
             ? '<button class="btn small primary" data-act="sort">Done</button>'
             : `<button class="btn-icon" data-act="sort" aria-label="Reorder routines">${icon('sort')}</button>`) : ''}
+          ${sorting ? '' : `<a class="btn-icon" href="#/coach" aria-label="Ask the Coach">${icon('chat')}</a>`}
           ${sorting ? '' : `<button class="btn-icon accent" data-act="new" aria-label="New routine">${icon('plus')}</button>`}
         </div>
       </header>
@@ -381,9 +387,10 @@ function viewRoutines() {
       ${sorting ? '<p class="muted small sort-tip">Drag the handles to reorder.</p>' : workoutDayNudge()}
       ${mine ? `
       <div class="rlist ${sorting ? 'sorting-mode' : ''}">
-        ${db.routines.length ? db.routines.map((r) => routineCard(r, sorting)).join('') : `<div class="empty small"><p>No routines yet. Make your own, or pick one from Explore.</p><button class="btn primary small" data-act="new">Create a routine</button></div>`}
+        ${db.routines.length ? db.routines.map((r) => routineCard(r, sorting)).join('') : `<div class="empty small"><p>No routines yet. Make your own, pick one from Explore, or ask the Coach to build one.</p><button class="btn primary small" data-act="new">Create a routine</button> <a class="btn small" href="#/coach">Ask the Coach</a></div>`}
       </div>` : `
       <section class="explore">
+        <a class="coach-cta" href="#/coach">${icon('spark')}<span><b>Not sure what to do?</b><span>Tell the Coach what's bothering you and get a routine built for you.</span></span>${icon('back', 'x-chev')}</a>
         <div class="search">${icon('search')}<input type="search" placeholder="Search routines or exercises" value="${esc(exploreQuery)}" aria-label="Search routines"></div>
         <div class="fwrap"></div>
         <div class="x-tools"><span class="x-count muted small"></span>
@@ -837,6 +844,157 @@ function viewExplore(id) {
     if (t.dataset.act === 'start') startRoutine((mine() ?? addCopy()).id);
   };
   return () => figs.forEach((f) => f.stop());
+}
+
+// ───────────────────────── Coach ─────────────────────────
+// A chat that asks what's going on, how long, what equipment and how fit, then builds a routine
+// (coach.js) and suggests Explore routines. The conversation stays put while the app is open.
+
+const coachChat = { msgs: [], prefs: null, ask: null, seed: 1, picked: [], result: null };
+const LEVEL_UP = { Beginner: 'Intermediate', Intermediate: 'Advanced', Advanced: 'Advanced' };
+const LEVEL_DOWN = { Advanced: 'Intermediate', Intermediate: 'Beginner', Beginner: 'Beginner' };
+const coachCtx = () => ({ exercises: allExercises(), estimate, explore: EXPLORE, routineGear, getEx });
+
+function coachSay(html, chips = [], extra = {}) { coachChat.msgs.push({ from: 'coach', html, chips, ...extra }); }
+function coachStart() {
+  Object.assign(coachChat, { msgs: [], prefs: { topics: [], caution: false }, ask: 'focus', seed: 1, picked: [], result: null });
+  coachSay(`Hi! I'm your Limber Coach. Tell me what's bothering you or what you want to work on, and I'll build a routine for you.<br><span class="muted small">For example: "my lower back is stiff from sitting" or "I want stronger legs, I have dumbbells and 30 minutes."</span>`, coachBrain.STARTERS);
+}
+
+// Next question still worth asking, or null when there's enough to build.
+function coachNext() {
+  const p = coachChat.prefs;
+  const { style } = coachBrain.plan(p);
+  const stretchy = ['relief', 'sleep', 'mobility'].includes(style);
+  if (!p.topics.length && !p.caution) return 'focus';
+  if (p.time === undefined) return 'time';
+  if (p.gear === undefined) { if (stretchy) p.gear = []; else return 'gear'; }
+  if (p.level === undefined) { if (stretchy) p.level = 'Beginner'; else return 'level'; }
+  return null;
+}
+
+function coachAsk() {
+  const q = coachNext();
+  coachChat.ask = q;
+  if (q === 'focus') coachSay("I didn't quite catch what you'd like to work on. Pick one of these, or describe it in your own words.", coachBrain.STARTERS);
+  if (q === 'time') coachSay('How much time do you have?', ['5 min', '10 min', '20 min', '30 min', '45 min', '60 min']);
+  if (q === 'gear') { coachChat.picked = []; coachSay('What equipment do you have? Tap everything that applies, then Done.', [], { gear: true }); }
+  if (q === 'level') coachSay('How would you describe your fitness level?', ['Beginner', 'Intermediate', 'Advanced']);
+  if (!q) coachBuild();
+}
+
+function coachBuild(intro) {
+  const p = coachChat.prefs;
+  const r = coachBrain.buildRoutine(p, coachCtx(), coachChat.seed);
+  const pl = coachBrain.plan(p);
+  const matches = coachBrain.matchExplore(p, coachCtx());
+  coachChat.result = { routine: r, saved: null };
+  stats.event('coach-built', pl.label);
+  const used = routineGear(r).filter((g) => g !== 'No equipment').map((g) => g.toLowerCase());
+  const gearTxt = used.length ? `using ${used.length > 1 ? `${used.slice(0, -1).join(', ')} and ${used.at(-1)}` : used[0]}` : 'with no equipment';
+  const caution = p.caution ? `<p class="coach-warn">${icon('info', 'inline')} Pain that's sharp, shoots down an arm or leg, or comes with numbness or tingling should be checked by a doctor or physical therapist before you exercise. If you've been cleared, here's a very gentle routine — stop anything that makes it worse.</p>` : '';
+  coachSay(`${caution}${intro ?? `Here's a ${Math.round(estimate(r) / 60)}-minute routine ${gearTxt}. I focused on ${pl.why}.`}`, ['Shuffle', 'Shorter', 'Longer', 'Easier', 'Harder', 'Start over'], { result: true, matches: matches.map((m) => m.id) });
+}
+
+function coachHear(text) {
+  text = text.trim();
+  if (!text) return;
+  coachChat.msgs.push({ from: 'me', html: esc(text) });
+  const p = coachChat.prefs;
+  const low = text.toLowerCase();
+  if (coachChat.result && ['shuffle', 'shorter', 'longer', 'easier', 'harder', 'start over'].includes(low)) {
+    if (low === 'start over') { coachStart(); return; }
+    if (low === 'shuffle') coachChat.seed++;
+    if (low === 'shorter') p.time = Math.max(5, (p.time ?? 20) - (p.time > 20 ? 10 : 5));
+    if (low === 'longer') p.time = Math.min(90, (p.time ?? 20) + (p.time >= 20 ? 10 : 5));
+    if (low === 'easier') p.level = LEVEL_DOWN[p.level ?? 'Beginner'];
+    if (low === 'harder') p.level = LEVEL_UP[p.level ?? 'Beginner'];
+    coachBuild({ shuffle: 'Here\'s a different mix.', shorter: `Trimmed to about ${p.time} minutes.`, longer: `Stretched to about ${p.time} minutes.`, easier: `Made it easier (${p.level.toLowerCase()} level).`, harder: `Made it harder (${p.level.toLowerCase()} level).` }[low]);
+    return;
+  }
+  const u = coachBrain.understand(text);
+  if (coachChat.ask === 'level' && !u.level && /^(beginner|intermediate|advanced)$/i.test(low)) u.level = text[0].toUpperCase() + low.slice(1);
+  if (u.topics.length) {
+    // A new problem after a finished routine starts a fresh request (keeping time, gear and level).
+    p.topics = coachChat.result ? u.topics : [...new Set([...p.topics, ...u.topics])];
+    if (coachChat.result) p.caution = false;
+  }
+  if (u.time !== undefined) p.time = u.time;
+  if (u.gear !== undefined) p.gear = u.gear;
+  if (u.level !== undefined) p.level = u.level;
+  p.caution = p.caution || u.caution;
+  const changed = u.topics.length || u.time !== undefined || u.gear !== undefined || u.level !== undefined || u.caution;
+  if (coachChat.result && changed && !coachNext()) { coachBuild(u.topics.length ? undefined : 'Updated to match.'); return; }
+  if (!changed && coachChat.ask && coachChat.ask !== 'focus') {
+    coachSay(coachChat.ask === 'time' ? 'Sorry, how many minutes? Tap one below or type something like "15 minutes".'
+      : coachChat.ask === 'level' ? 'Tap the level that fits best.' : 'Tap what you have, or "No equipment".',
+    coachChat.ask === 'time' ? ['5 min', '10 min', '20 min', '30 min', '45 min', '60 min'] : coachChat.ask === 'level' ? ['Beginner', 'Intermediate', 'Advanced'] : [], { gear: coachChat.ask === 'gear' });
+    return;
+  }
+  coachAsk();
+}
+
+function viewCoach() {
+  if (!coachChat.msgs.length) coachStart();
+  const figs = [];
+  const draw = () => {
+    figs.splice(0).forEach((f) => f.stop());
+    const last = coachChat.msgs.length - 1;
+    const resultIdx = coachChat.msgs.map((m) => !!m.result).lastIndexOf(true);
+    app.innerHTML = `
+      <header class="top"><a class="btn-icon" href="#/" aria-label="Back">${icon('back')}</a><div class="top-title">Coach</div><button class="btn-icon" data-act="restart" aria-label="Start over">${icon('edit')}</button></header>
+      <p class="coach-note muted small">The Coach builds routines from Limber's exercise library using built-in rules. It isn't a medical professional.</p>
+      <div class="chat">${coachChat.msgs.map((m, i) => `
+        <div class="msg ${m.from}">${m.html}</div>
+        ${m.result && i === resultIdx ? coachResultCard() : ''}
+        ${m.result && i === resultIdx && m.matches?.length ? `<div class="msg coach">You might also like these ready-made routines:</div><div class="coach-matches">${m.matches.map((id) => { const x = EXPLORE.find((r) => r.id === id); return `<a class="xrow" href="#/explore/${x.id}"><span class="x-text"><b>${esc(x.name)}</b><span class="x-meta">${typeDots(x.steps)}<span>${x.level} · ~${fmtMin(estimate(x))}</span></span></span>${icon('back', 'x-chev')}</a>`; }).join('')}</div>` : ''}
+        ${i === last && m.chips?.length ? `<div class="chips quick">${m.chips.map((c) => `<button class="chip" data-say="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
+        ${i === last && m.gear ? `<div class="chips quick">${coachBrain.GEAR_CHOICES.map((g) => `<button class="chip ${coachChat.picked.includes(g) ? 'on' : ''}" data-gear="${g}">${g}</button>`).join('')}<button class="chip" data-say="No equipment">No equipment</button><button class="chip done" data-act="gear-done" ${coachChat.picked.length ? '' : 'disabled'}>Done</button></div>` : ''}
+      `).join('')}</div>
+      <form class="chat-input" autocomplete="off"><input name="q" placeholder="Describe what you need…" aria-label="Message the Coach" enterkeyhint="send"><button class="btn-icon accent" aria-label="Send">${icon('send')}</button></form>`;
+    $$('.chat .step-thumb', app).forEach((el) => figs.push(renderFigure(el, getEx(el.dataset.ex), { animate: false, aspect: 1.15, arrows: false })));
+    requestAnimationFrame(() => window.scrollTo(0, document.body.scrollHeight));
+  };
+  const say = (text) => { coachHear(text); draw(); };
+  app.onclick = (e) => {
+    const t = e.target.closest('[data-say],[data-gear],[data-act]');
+    if (!t) return;
+    if (t.dataset.say) { say(t.dataset.say); return; }
+    if (t.dataset.gear) { const g = t.dataset.gear; coachChat.picked = coachChat.picked.includes(g) ? coachChat.picked.filter((x) => x !== g) : [...coachChat.picked, g]; draw(); return; }
+    const res = coachChat.result;
+    switch (t.dataset.act) {
+      case 'gear-done': say(`I have ${coachChat.picked.map((g) => g.toLowerCase()).join(', ')}`); break;
+      case 'restart': coachStart(); draw(); break;
+      case 'coach-save': case 'coach-start': {
+        if (!res.saved || !getRoutine(res.saved)) {
+          const r = { ...clone(res.routine), id: uid(), from: 'coach', steps: res.routine.steps.map((st) => ({ ...st, id: uid() })) };
+          db.routines.unshift(r); save(); res.saved = r.id;
+          stats.event('coach-saved', coachBrain.plan(coachChat.prefs).label);
+        }
+        if (t.dataset.act === 'coach-start') startRoutine(res.saved); else { toast('Saved to My routines'); draw(); }
+        break;
+      }
+      case 'coach-open': location.hash = `#/routine/${res.saved}`; break;
+    }
+  };
+  app.onsubmit = (e) => { e.preventDefault(); const q = e.target.elements.q; const v = q.value; q.value = ''; say(v); };
+  draw();
+  return () => { figs.forEach((f) => f.stop()); app.onsubmit = null; };
+}
+
+// The routine the Coach just built: what's in it and Save / Start.
+function coachResultCard() {
+  const { routine: r, saved } = coachChat.result;
+  const steps = r.steps.filter((st) => getEx(st.ex));
+  const savedOk = saved && getRoutine(saved);
+  return `<div class="coach-card">
+    <div class="coach-card-head"><b>${esc(r.name)}</b><span class="x-meta">${typeDots(steps)}<span>~${fmtMin(estimate(r))} · ${steps.length} exercises</span></span></div>
+    <ol class="coach-steps">${steps.map((st) => { const ex = getEx(st.ex); return `<li style="--acc:${typeVar(ex.type)}"><span class="step-thumb" data-ex="${ex.id}"></span><span class="step-text"><span class="step-name">${esc(ex.name)}</span><span class="step-sum">${stepSummary(st)}</span></span></li>`; }).join('')}</ol>
+    <div class="coach-actions">
+      ${savedOk ? `<button class="btn" data-act="coach-open">${icon('check')} Saved — edit</button>` : `<button class="btn" data-act="coach-save">${icon('plus')} Save</button>`}
+      <button class="btn primary" data-act="coach-start">${icon('play')} Start</button>
+    </div>
+  </div>`;
 }
 
 // ───────────────────────── Library ─────────────────────────
