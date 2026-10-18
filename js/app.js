@@ -198,7 +198,7 @@ function menu(items) {
 // ───────────────────────── Feedback ─────────────────────────
 
 // Feedback goes out as an email from the tester's own mail app, with what they were looking at attached.
-const FEEDBACK_EMAIL = '__EMAIL__';
+const FEEDBACK_EMAIL = 'nbantle@gmail.com';
 const FEEDBACK_KINDS = [['problem', 'Problem'], ['idea', 'Idea'], ['other', 'Other']];
 let lastScreen = '#/';
 
