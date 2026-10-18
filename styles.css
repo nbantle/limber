@@ -194,7 +194,8 @@ body.playing .tabbar { display: none; }
 .fgroup-l { display: block; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2); margin-bottom: 8px; }
 .fpanel .chip { padding: 6px 12px; font-size: 13.5px; }
 .sheet .fpanel { box-shadow: none; background: var(--surface-2); }
-.sheet .fpanel .chip:not(.on) { background: var(--surface); }.lib-count { margin: 0 2px 6px; }
+.sheet .fpanel .chip:not(.on) { background: var(--surface); }
+.fb-count { align-self: center; margin-left: 2px; white-space: nowrap; }
 
 /* ── Home: My routines + Explore ── */
 .home-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 2px 0 14px; }

@@ -805,12 +805,13 @@ const EX_FILTERS = [
   { key: 'area', label: 'Body area', options: Object.entries(AREAS).map(([k, a]) => [k, a.label]) },
 ];
 
-function filterBar(state, groups) {
+function filterBar(state, groups, count = '') {
   const active = groups.filter((g) => state[g.key] !== 'all');
   const label = (g, v) => g.options.find(([x]) => x === v)?.[1] ?? v;
   return `<div class="fbar">
       <button class="chip ${active.length ? '' : 'on'}" data-fb="all">All</button>
       ${active.map((g) => `<button class="chip on removable" data-fb-clear="${g.key}" aria-label="Remove ${esc(label(g, state[g.key]))} filter">${esc(label(g, state[g.key]))}${icon('close', 'x')}</button>`).join('')}
+      ${count ? `<span class="fb-count muted small">${count}</span>` : ''}
       <button class="chip more ${state.open ? 'open' : ''}" data-fb="toggle" aria-expanded="${state.open}">${icon('filter', 'inline')} ${state.open ? 'Hide filters' : 'Filters'}</button>
     </div>
     ${state.open ? `<div class="fpanel">${groups.map((g) => `<div class="fgroup"><span class="fgroup-l">${g.label}</span><div class="chips wrap">${[['all', 'Any'], ...g.options].map(([v, l]) => `<button class="chip ${state[g.key] === v ? 'on' : ''}" data-fb-set="${g.key}" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`).join('')}</div>` : ''}`;
@@ -1088,14 +1089,12 @@ function viewLibrary() {
     <header class="top"><h1>Exercises</h1><a class="btn-icon accent" href="#/custom/new" aria-label="New custom exercise">${icon('plus')}</a></header>
     <div class="search">${icon('search')}<input type="search" placeholder="Search exercises or muscles" value="${esc(libQuery)}" aria-label="Search"></div>
     <div class="fwrap"></div>
-    <p class="lib-count muted small"></p>
     <div class="ex-grid"></div>`;
   const grid = $('.ex-grid', app);
   const draw = () => {
     figs.splice(0).forEach((f) => f.stop());
-    $('.fwrap', app).innerHTML = filterBar(libState, EX_FILTERS);
     const items = filterExercises(allExercises(), libState.type, libQuery, libState.area);
-    $('.lib-count', app).textContent = `${items.length} exercise${items.length === 1 ? '' : 's'}`;
+    $('.fwrap', app).innerHTML = filterBar(libState, EX_FILTERS, `${items.length} exercise${items.length === 1 ? '' : 's'}`);
     grid.innerHTML = items.map((ex) => `<a class="ex-card" href="#/exercise/${ex.id}" style="--acc:${typeVar(ex.type)}">
       <span class="ex-thumb" data-ex="${ex.id}"></span>
       <span class="ex-name">${esc(ex.name)}</span>
