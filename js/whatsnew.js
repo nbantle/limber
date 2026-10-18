@@ -2,6 +2,13 @@
 // the app shows everything newer than the last note a person has seen, once, after the update loads.
 export const RELEASES = [
   {
+    id: 4,
+    date: 'October 2026',
+    items: [
+      ['spark', 'Refreshed coaches', 'New hair, ears and a softer nose for Ava and Max, no more cheek blush, and smoother shoulders and hips.'],
+    ],
+  },
+  {
     id: 3,
     date: 'October 2026',
     items: [
