@@ -166,6 +166,10 @@ const GLUTE_R = 4.2; // matches GLUTE.r in figure.js
 // App-facing look: which coach and skin tone the Studio character uses.
 export const COACHES = { a: { label: 'Ava', person: 'ava' }, b: { label: 'Max', person: 'max' } };
 export const SKINS = ['#f7d5b8', '#eab38e', '#c68a62', '#8b5a3c'];
+// Face options (ear: 'current' | 'a' | 'b' | 'c'; hair: 'classic' | 'real'). setFace is only used by dev demos.
+const FACE = { ear: 'current', hair: 'classic', blush: true };
+export function setFace(opts) { Object.assign(FACE, opts); }
+
 let look = { person: 'ava', skin: SKINS[1] };
 export function setLook(coach, skin) {
   look = { person: (COACHES[coach] ?? COACHES.a).person, skin: SKINS[skin] ?? SKINS[1] };
@@ -324,22 +328,44 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
 
   const head = () => {
     const R = 4.9 * S.head;
-    const C = J.head;
-    const U = norm([C[0] - J.neck[0], C[1] - J.neck[1]]);
+    const HC = J.head;
+    const U = norm([HC[0] - J.neck[0], HC[1] - J.neck[1]]);
     const F = [-U[1], U[0]]; // facing (side) / screen-right (front)
-    const Q = (fw, up) => [C[0] + F[0] * fw * R + U[0] * up * R, C[1] + F[1] * fw * R + U[1] * up * R];
-    const ell = (c, rx, ry, fill, extra = {}) => {
-      const ang = (Math.atan2(F[1], F[0]) * 180) / Math.PI;
+    const Q = (fw, up) => [HC[0] + F[0] * fw * R + U[0] * up * R, HC[1] + F[1] * fw * R + U[1] * up * R];
+    const ell = (c, rx, ry, fill, extra = {}, tilt = 0) => {
+      const ang = (Math.atan2(F[1], F[0]) * 180) / Math.PI + tilt;
       ops.push({ tag: 'ellipse', cx: f(c[0]), cy: f(c[1]), rx: f(rx * R), ry: f(ry * R), transform: `rotate(${f(ang)} ${f(c[0])} ${f(c[1])})`, fill, ...extra });
     };
     const poly = (list, fill, extra = {}) => push(smooth(list.map(([a, b]) => Q(a, b))), fill, extra);
     const line = (list, color, w, extra = {}) => ops.push({ tag: 'path', d: smooth(list.map(([a, b]) => Q(a, b)), true), stroke: color, 'stroke-width': w * R, 'stroke-linecap': 'round', fill: 'none', ...extra });
     if (who.mono) {
       if (side) { poly([[-0.95, 0.15], [-0.6, 0.85], [0.2, 1.0], [0.85, 0.45], [0.95, -0.15], [0.7, -0.75], [0.15, -0.95], [-0.55, -0.7]], skin); }
-      else ell(C, 0.86, 1.0, skin);
+      else ell(HC, 0.86, 1.0, skin);
       return;
     }
     const tn = Math.max(-1, Math.min(1, J.turn ?? 0)) * 0.4;
+    const real = FACE.hair === 'real';
+    const hairHi = shade(who.hair, -0.2), hairLo = shade(who.hair, 0.35), fade = mix(who.hair, skin, 0.42);
+    // Ear: x is the ear's centre across the face (side view: 0 = middle of the head), m mirrors it.
+    const ear = (x, y, m = 1, sideView = false) => {
+      const e = FACE.ear, dark = shade(skin, 0.16), base = shade(skin, 0.07);
+      if (e === 'current') { ell(Q(x, y), sideView ? 0.15 : 0.14, 0.22, shade(skin, sideView ? 0.12 : 0.08)); return; }
+      if (e === 'a') { // classic C-shaped ear with an inner fold
+        ell(Q(x, y), sideView ? 0.16 : 0.13, 0.23, base);
+        line(sideView ? [[x + 0.06, y + 0.12], [x - 0.06, y + 0.1], [x - 0.08, y - 0.04], [x - 0.02, y - 0.12]] : [[x - 0.03 * m, y + 0.13], [x + 0.04 * m, y + 0.06], [x + 0.04 * m, y - 0.06], [x - 0.01 * m, y - 0.13]], dark, 0.04);
+        return;
+      }
+      if (e === 'b') { // tucked teardrop: wider at the top, soft lobe, inner shadow
+        poly(sideView
+          ? [[x + 0.06, y + 0.22], [x - 0.1, y + 0.2], [x - 0.15, y + 0.04], [x - 0.08, y - 0.16], [x + 0.02, y - 0.24], [x + 0.07, y - 0.1], [x + 0.06, y + 0.08]]
+          : [[x - 0.04 * m, y + 0.2], [x + 0.1 * m, y + 0.16], [x + 0.13 * m, y + 0.02], [x + 0.06 * m, y - 0.18], [x - 0.03 * m, y - 0.22], [x - 0.05 * m, y - 0.04]], base);
+        ell(Q(x + (sideView ? -0.03 : 0.04 * m), y + 0.03), sideView ? 0.06 : 0.04, 0.1, dark, { opacity: 0.55 });
+        return;
+      }
+      // 'c': minimal — small, same tone as the face, one soft line
+      ell(Q(x, y), sideView ? 0.12 : 0.1, 0.17, skin);
+      line(sideView ? [[x + 0.03, y + 0.08], [x - 0.04, y + 0.02], [x + 0.0, y - 0.08]] : [[x, y + 0.08], [x + 0.03 * m, y], [x, y - 0.08]], dark, 0.03, { opacity: 0.7 });
+    };
     if (side) {
       if (fem) {
         // Ponytail.
@@ -350,30 +376,51 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
         const p2 = add(add(p1, bk, 0.35 * R), g, 0.8 * R);
         const p3 = add(add(p2, bk, 0.05 * R), g, 0.8 * R);
         const p4 = add(p3, g, 0.5 * R);
-        const rads = [0.36, 0.44, 0.42, 0.3, 0.1];
+        const rads = real ? [0.34, 0.46, 0.44, 0.3, 0.06] : [0.36, 0.44, 0.42, 0.3, 0.1];
         // Lying down, the ponytail rests on the floor instead of hanging through it.
         const T = [p0, p1, p2, p3, p4].map((p, i) => (floor ? [p[0], Math.min(p[1], -rads[i] * R - 0.15)] : p));
         const fr = { at: (u) => { const i = Math.min(3, Math.floor(u * 4)); const k = u * 4 - i; return [T[i][0] + (T[i + 1][0] - T[i][0]) * k, T[i][1] + (T[i + 1][1] - T[i][1]) * k]; }, tan: (u) => { const i = Math.min(3, Math.floor(u * 4)); return norm([T[i + 1][0] - T[i][0], T[i + 1][1] - T[i][1]]); } };
         push(part(fr, rads.map((r, i) => [i / 4, r * R, r * R]), 0, 1), who.hair);
+        if (real) {
+          // Strands down the tail: one lighter sheen, one darker groove.
+          for (const [off, col, w] of [[0.12, hairHi, 0.05], [-0.14, hairLo, 0.045]]) {
+            const pts = [0.12, 0.35, 0.6, 0.85].map((u) => { const c = fr.at(u), t = fr.tan(u), n = [-t[1], t[0]]; return add(c, n, off * R * (1 - u * 0.6)); });
+            ops.push({ tag: 'path', d: smooth(pts, true), stroke: col, 'stroke-width': w * R, 'stroke-linecap': 'round', fill: 'none', opacity: 0.8 });
+          }
+        }
       }
       // Skull + face profile (jaw, nose, chin).
       poly([[-0.92, 0.1], [-0.72, 0.72], [-0.1, 1.0], [0.55, 0.82], [0.86, 0.35], [0.9, 0.05], [1.06, -0.12], [0.88, -0.22], [0.86, -0.5], [0.66, -0.72], [0.38, -0.86], [-0.05, -0.8], [-0.45, -0.72], [-0.82, -0.4]], skin);
-      // Hair cap.
-      if (fem) poly([[0.62, 0.62], [0.2, 1.04], [-0.55, 0.92], [-1.0, 0.35], [-0.98, -0.3], [-0.72, -0.62], [-0.42, -0.2], [-0.22, 0.3], [0.2, 0.46]], who.hair);
-      else poly([[0.66, 0.6], [0.35, 1.06], [-0.4, 1.02], [-0.96, 0.5], [-0.96, -0.1], [-0.66, -0.36], [-0.38, 0.05], [-0.1, 0.42], [0.36, 0.52]], who.hair);
+      // Hair.
+      if (!real) {
+        if (fem) poly([[0.62, 0.62], [0.2, 1.04], [-0.55, 0.92], [-1.0, 0.35], [-0.98, -0.3], [-0.72, -0.62], [-0.42, -0.2], [-0.22, 0.3], [0.2, 0.46]], who.hair);
+        else poly([[0.66, 0.6], [0.35, 1.06], [-0.4, 1.02], [-0.96, 0.5], [-0.96, -0.1], [-0.66, -0.36], [-0.38, 0.05], [-0.1, 0.42], [0.36, 0.52]], who.hair);
+      } else if (fem) {
+        // Pulled back to the ponytail: hairline at the temple, wisp in front of the ear, strands sweeping back.
+        poly([[0.64, 0.6], [0.3, 1.02], [-0.4, 1.02], [-0.92, 0.62], [-1.0, 0.2], [-0.92, -0.3], [-0.72, -0.5], [-0.46, -0.32], [-0.38, 0.02], [-0.28, 0.24], [-0.06, 0.3], [0.03, 0.06], [0.1, 0.1], [0.14, 0.36], [0.42, 0.46]], who.hair);
+        line([[0.5, 0.68], [0.0, 0.9], [-0.55, 0.8]], hairHi, 0.035, { opacity: 0.7 });
+        line([[0.3, 0.5], [-0.15, 0.62], [-0.6, 0.6]], hairLo, 0.03, { opacity: 0.6 });
+        line([[-0.1, 0.4], [-0.45, 0.46], [-0.7, 0.58]], hairHi, 0.03, { opacity: 0.5 });
+      } else {
+        // Short textured crop: fuller on top, faded above and behind the ear, short sideburn.
+        // Faded back and sides first, then the fuller top over it.
+        poly([[0.66, 0.6], [0.3, 1.04], [-0.4, 1.04], [-0.9, 0.66], [-0.98, 0.2], [-0.92, -0.26], [-0.72, -0.46], [-0.46, -0.3], [-0.38, 0.02], [-0.28, 0.22], [-0.08, 0.28], [0.02, 0.04], [0.1, 0.06], [0.14, 0.34], [0.4, 0.48]], fade);
+        poly([[0.7, 0.58], [0.62, 0.76], [0.66, 0.84], [0.42, 1.04], [0.0, 1.12], [-0.45, 1.06], [-0.86, 0.76], [-0.96, 0.42], [-0.6, 0.4], [-0.2, 0.42], [0.1, 0.48], [0.38, 0.52]], who.hair);
+        line([[0.55, 0.76], [0.2, 0.96], [-0.25, 0.98]], hairHi, 0.035, { opacity: 0.7 });
+        line([[0.3, 0.64], [-0.05, 0.8], [-0.5, 0.82]], hairLo, 0.03, { opacity: 0.6 });
+      }
       if (fem) ell(Q(-0.72, 0.72), 0.14, 0.16, who.tie);
-      ell(Q(-0.2, -0.05), 0.15, 0.22, shade(skin, 0.12)); // ear
+      ear(-0.2, -0.05, 1, true);
       if (S.face !== 'none') {
         ell(Q(0.56, 0.1), S.face === 'simple' ? 0.11 : 0.09, S.face === 'simple' ? 0.11 : 0.13, C.charcoal, { opacity: 1 });
         if (S.face === 'full') line([[0.42, 0.34], [0.66, 0.36]], who.hair, 0.09);
         line([[0.6, -0.48], [0.76, -0.46]], LIPS, 0.07);
-        ell(Q(0.48, -0.25), 0.15, 0.1, C.coral, { opacity: 0.35 });
+        if (FACE.blush) ell(Q(0.48, -0.25), 0.15, 0.1, C.coral, { opacity: 0.35 });
       }
       return;
     }
     if (back) {
-      ell(Q(-0.9, -0.05), 0.15, 0.22, shade(skin, 0.08));
-      ell(Q(0.9, -0.05), 0.15, 0.22, shade(skin, 0.08));
+      ear(-0.9, -0.05, -1); ear(0.9, -0.05, 1);
       if (fem) {
         poly([[-0.88, 0.1], [-0.6, 0.85], [0, 1.06], [0.6, 0.85], [0.88, 0.1], [0.75, -0.6], [0, -0.85], [-0.75, -0.6]], who.hair);
         poly([[-0.3, 0.5], [0.3, 0.5], [0.42, -0.4], [0.25, -1.3], [0, -1.6], [-0.25, -1.3], [-0.42, -0.4]], shade(who.hair, -0.06));
@@ -382,19 +429,35 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       return;
     }
     // Front.
-    if (fem) poly([[-0.98, 0.1], [-0.82, 0.85], [0, 1.1], [0.82, 0.85], [0.98, 0.1], [0.9, -0.55], [-0.9, -0.55]], who.hair);
-    ell(Q(-0.88 + tn * 0.2, -0.05), 0.14, 0.22, shade(skin, 0.08));
-    ell(Q(0.88 + tn * 0.2, -0.05), 0.14, 0.22, shade(skin, 0.08));
+    if (fem && !real) poly([[-0.98, 0.1], [-0.82, 0.85], [0, 1.1], [0.82, 0.85], [0.98, 0.1], [0.9, -0.55], [-0.9, -0.55]], who.hair);
+    ear(-0.86 + tn * 0.2, -0.05, -1); ear(0.86 + tn * 0.2, -0.05, 1);
     poly([[-0.84, 0.15], [-0.7, 0.75], [0, 0.98], [0.7, 0.75], [0.84, 0.15], [0.72, -0.5], [0.35, -0.9], [0, -0.98], [-0.35, -0.9], [-0.72, -0.5]].map(([a, b]) => [a + tn * 0.15, b]), skin);
-    if (fem) poly([[-0.9, 0.1], [-0.78, 0.8], [0, 1.1], [0.78, 0.8], [0.9, 0.1], [0.62, 0.48], [0.1 + tn, 0.6], [-0.4, 0.44], [-0.72, 0.36]], who.hair);
-    else poly([[-0.88, 0.2], [-0.72, 0.86], [0, 1.08], [0.72, 0.86], [0.88, 0.2], [0.66, 0.6], [0.2, 0.68], [-0.35, 0.62], [-0.7, 0.52]], who.hair);
+    if (!real) {
+      if (fem) poly([[-0.9, 0.1], [-0.78, 0.8], [0, 1.1], [0.78, 0.8], [0.9, 0.1], [0.62, 0.48], [0.1 + tn, 0.6], [-0.4, 0.44], [-0.72, 0.36]], who.hair);
+      else poly([[-0.88, 0.2], [-0.72, 0.86], [0, 1.08], [0.72, 0.86], [0.88, 0.2], [0.66, 0.6], [0.2, 0.68], [-0.35, 0.62], [-0.7, 0.52]], who.hair);
+    } else if (fem) {
+      // Pulled back with a side part; hair wraps the temples and tucks behind the ears.
+      const p = 0.28 + tn;
+      poly([[-0.9, 0.0], [-0.86, 0.6], [-0.5, 0.98], [p, 1.1], [0.62, 0.98], [0.9, 0.6], [0.92, 0.02], [0.8, 0.12], [0.7, 0.5], [p + 0.1, 0.66], [p - 0.05, 0.62], [-0.3, 0.58], [-0.68, 0.46], [-0.8, 0.1]], who.hair);
+      line([[p, 1.06], [p - 0.02, 0.72]], hairLo, 0.04, { opacity: 0.9 });
+      line([[p - 0.08, 0.96], [-0.35, 0.86], [-0.72, 0.56]], hairHi, 0.035, { opacity: 0.7 });
+      line([[p - 0.1, 0.78], [-0.4, 0.7], [-0.76, 0.36]], hairLo, 0.03, { opacity: 0.6 });
+      line([[p + 0.1, 0.96], [0.58, 0.86], [0.8, 0.5]], hairHi, 0.03, { opacity: 0.6 });
+      line([[-0.8, 0.2], [-0.84, -0.12]], who.hair, 0.04, { opacity: 0.9 }); // loose wisp at the temple
+    } else {
+      // Short textured crop: soft uneven fringe, faded sides down to the ears.
+      for (const m of [-1, 1]) poly([[0.88 * m, 0.46], [0.9 * m, 0.04], [0.84 * m, -0.06], [0.8 * m, 0.2], [0.76 * m, 0.46]], fade);
+      poly([[-0.9, 0.34], [-0.84, 0.78], [-0.5, 1.04], [0, 1.14], [0.5, 1.04], [0.84, 0.78], [0.9, 0.34], [0.76, 0.5], [0.56, 0.6], [0.42, 0.57], [0.24, 0.63], [0.06, 0.59], [-0.14, 0.64], [-0.34, 0.6], [-0.56, 0.62], [-0.76, 0.5]].map(([a, b]) => [a + tn * 0.1, b]), who.hair);
+      line([[-0.5, 0.9], [-0.1, 1.02], [0.36, 0.96]].map(([a, b]) => [a + tn * 0.1, b]), hairHi, 0.035, { opacity: 0.7 });
+      line([[-0.3, 0.76], [0.05, 0.84], [0.5, 0.78]].map(([a, b]) => [a + tn * 0.1, b]), hairLo, 0.03, { opacity: 0.6 });
+    }
     if (S.face !== 'none') {
       for (const x of [-0.32, 0.32]) {
         const xx = x + tn;
         if (Math.abs(xx) > 0.78) continue;
         ell(Q(xx, 0.06), S.face === 'simple' ? 0.11 : 0.09, S.face === 'simple' ? 0.11 : 0.13, C.charcoal, { opacity: 1 });
         if (S.face === 'full') line([[xx - 0.13, 0.3], [xx + 0.13, 0.31]], who.hair, 0.08);
-        ell(Q(xx * 1.35, -0.3), 0.14, 0.09, C.coral, { opacity: 0.35 });
+        if (FACE.blush) ell(Q(xx * 1.35, -0.3), 0.14, 0.09, C.coral, { opacity: 0.35 });
       }
       line([[-0.16 + tn, -0.44], [tn, -0.52], [0.16 + tn, -0.44]], LIPS, 0.07);
     }

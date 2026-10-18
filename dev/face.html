@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>Face options</title><link rel="stylesheet" href="../styles.css">
+<style>
+body{font:600 15px -apple-system,system-ui;background:#fff;color:#1f242c;margin:12px;min-height:0}
+.grid{display:grid;grid-template-columns:110px repeat(4,200px);gap:10px;align-items:center}
+.h{font-weight:800;text-align:center}.cell{background:#f1f4f8;border-radius:14px;height:200px}
+.cell svg{width:100%;height:100%;display:block}
+</style>
+<div class=grid id=g></div>
+<script type=module>
+import { EXERCISES } from '../js/exercises.js'; import { renderFigure } from '../js/figure.js'; import { setLook, setFace } from '../js/character2.js';
+const cols = [['Current', { hair: 'classic', ear: 'current', blush: true }], ['Ear A · classic', { hair: 'real', ear: 'a', blush: false }], ['Ear B · tucked', { hair: 'real', ear: 'b', blush: false }], ['Ear C · minimal', { hair: 'real', ear: 'c', blush: false }]];
+const rows = [['Max front', 'b', 'db-shrug'], ['Max side', 'b', 'calf-raises'], ['Ava front', 'a', 'db-shrug'], ['Ava side', 'a', 'calf-raises']];
+const g = document.getElementById('g');
+g.innerHTML = '<div></div>' + cols.map(([l]) => `<div class=h>${l}</div>`).join('');
+for (const [label, coach, id] of rows) {
+  g.insertAdjacentHTML('beforeend', `<div class=h style="text-align:left">${label}</div>`);
+  for (const [, opts] of cols) {
+    const c = document.createElement('div'); c.className = 'cell'; g.append(c);
+    setLook(coach, 1); setFace(opts);
+    renderFigure(c, EXERCISES.find((e) => e.id === id), { animate: false, arrows: false, highlight: false });
+    const svg = c.querySelector('svg');
+    const eyes = [...svg.querySelectorAll('ellipse')].filter((e) => e.getAttribute('fill') === '#1f242c');
+    const bb = eyes.map((e) => e.getBBox()); const cx = bb.reduce((s, b) => s + b.x + b.width / 2, 0) / bb.length, cy = bb.reduce((s, b) => s + b.y + b.height / 2, 0) / bb.length;
+    const dx = id === 'calf-raises' ? -2.4 : 0;
+    svg.setAttribute('viewBox', `${cx - 8.5 + dx} ${cy - 8.5} 17 17`);
+    svg.querySelectorAll('.stage-tex,.fig-ground,.fig-shadow,.fig-mat').forEach((n) => n.remove());
+  }
+}
+</script>
