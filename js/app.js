@@ -4,11 +4,12 @@ import { renderFigure, BAND_COLORS } from './figure.js';
 import { COACHES, SKINS, setLook } from './character2.js';
 import { muscleMapSVG } from './muscles.js';
 import { audio, wakeLock } from './audio.js';
+import * as stats from './analytics.js';
 
 // ───────────────────────── Storage ─────────────────────────
 
 const KEY = 'limber.v1';
-const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5, coach: 'a', skin: 1, units: 'lb', reminder: { days: [], time: '07:00' }, theme: 'auto' };
+const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5, coach: 'a', skin: 1, units: 'lb', reminder: { days: [], time: '07:00' }, theme: 'auto', stats: true };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -56,6 +57,11 @@ function getEx(id) {
 }
 const allExercises = () => [...EXERCISES, ...db.custom.map((c) => getEx(c.id))];
 const getRoutine = (id) => db.routines.find((r) => r.id === id);
+
+stats.setAllowed(() => db.settings.stats !== false);
+// Once per launch: installed app or browser tab.
+stats.event(isStandaloneApp() ? 'open-installed-app' : 'open-in-browser');
+function isStandaloneApp() { return window.navigator.standalone || window.matchMedia?.('(display-mode: standalone)').matches; }
 
 // ───────────────────────── Helpers ─────────────────────────
 
@@ -269,6 +275,7 @@ function render() {
       document.body.dataset.tab = tab;
       document.body.classList.toggle('playing', hash.startsWith('#/play'));
       cleanup = fn(...m.slice(1)) || null;
+      stats.pageview(hash);
       updateTabs(tab);
       return;
     }
@@ -283,15 +290,16 @@ function updateTabs(tab) {
 
 // ───────────────────────── Routines ─────────────────────────
 
-const isStandalone = () => window.navigator.standalone || window.matchMedia?.('(display-mode: standalone)').matches;
+const isStandalone = isStandaloneApp;
 
 // Home: My routines (compact rows) and Explore — ready-made routines with search, filters and sort.
-const exploreState = { open: false, goal: 'all', gear: 'all', level: 'all' };
+const exploreState = { open: false, goal: 'all', len: 'all', gear: 'all', level: 'all' };
 let exploreQuery = '', exploreSort = 'recommended';
 
 const GEAR = ['No equipment', 'Dumbbells', 'Kettlebell', 'Barbell', 'Bands', 'Pull-up bar', 'Chair or bench'];
 const EXPLORE_FILTERS = [
   { key: 'goal', label: 'Goal', options: GOALS.map((g) => [g, g]) },
+  { key: 'len', label: 'Length', options: [['short', 'Under 10 min'], ['mid', '10–20 min'], ['long', '20–40 min'], ['xl', '40+ min']] },
   { key: 'gear', label: 'Equipment', options: GEAR.map((g) => [g, g]) },
   { key: 'level', label: 'Level', options: LEVELS.map((l) => [l, l]) },
 ];
@@ -317,8 +325,9 @@ function routineGear(r) {
 function exploreResults() {
   const q = exploreQuery.trim().toLowerCase();
   const S = exploreState;
-  const list = EXPLORE.map((r, i) => ({ r, i, secs: estimate(r), gear: routineGear(r) })).filter(({ r, gear }) =>
-    (S.goal === 'all' || r.goal === S.goal) && (S.level === 'all' || r.level === S.level) && (S.gear === 'all' || gear.includes(S.gear)) &&
+  const LEN = { short: [0, 600], mid: [600, 1200], long: [1200, 2400], xl: [2400, Infinity] };
+  const list = EXPLORE.map((r, i) => ({ r, i, secs: estimate(r), gear: routineGear(r) })).filter(({ r, gear, secs }) =>
+    (S.goal === 'all' || r.goal === S.goal) && (S.len === 'all' || (secs >= LEN[S.len][0] && secs < LEN[S.len][1])) && (S.level === 'all' || r.level === S.level) && (S.gear === 'all' || gear.includes(S.gear)) &&
     (!q || [r.name, r.desc, r.goal, r.level, ...gear, ...r.steps.map((st) => getEx(st.ex)?.name ?? '')].some((x) => x.toLowerCase().includes(q))));
   const by = {
     recommended: (a, b) => a.i - b.i,
@@ -344,7 +353,7 @@ function viewRoutines() {
       const added = db.routines.some((m) => m.from === r.id);
       return `<a class="xrow" href="#/explore/${r.id}" style="--acc:${typeVar(getEx(r.steps[0].ex)?.type)}">
         <span class="x-thumb" data-ex="${r.steps[0].ex}"></span>
-        <span class="x-text"><b>${esc(r.name)}</b><span>${r.level} · ~${fmtMin(secs)} · ${esc(gear.join(', '))}</span></span>
+        <span class="x-text"><b>${esc(r.name)}</b><span class="x-meta">${typeDots(r.steps)}<span>${r.level} · ~${fmtMin(secs)} · ${esc(gear.join(', '))}</span></span></span>
         ${added ? `<span class="x-added" aria-label="In My routines">${icon('check')}</span>` : icon('back', 'x-chev')}
       </a>`;
     }).join('') || '<p class="muted pad center">No routines match. Try clearing a filter.</p>';
@@ -413,15 +422,18 @@ function workoutDayNudge() {
   return `<div class="hint nudge"><div><strong>It's a workout day</strong><p>Pick a routine below and press play.</p></div><button class="btn-icon" data-act="nudge" aria-label="Dismiss">${icon('close')}</button></div>`;
 }
 
+// One colored dot per exercise type in a routine (stretch, calisthenics, weights, bands).
+const typeDots = (steps) => Object.keys(TYPES).filter((k) => steps.some((st) => getEx(st.ex)?.type === k)).map((k) => `<i class="tdot" style="background:${TYPES[k].color}" title="${TYPES[k].label}"></i>`).join('');
+
 // Compact My routines row: name, a one-line summary with type dots, and play (or a drag handle while reordering).
 function routineCard(r, sorting = false) {
   const infos = r.steps.map(stepInfo).filter(Boolean);
-  const dots = Object.keys(TYPES).filter((k) => infos.some((i) => i.ex.type === k)).map((k) => `<i class="tdot" style="background:${TYPES[k].color}" title="${TYPES[k].label}"></i>`).join('');
+  const dots = typeDots(r.steps);
   const last = db.history.find((h) => h.routineId === r.id);
   return `<article class="rrow" data-id="${r.id}">
     <button class="rrow-main" ${sorting ? 'tabindex="-1"' : 'data-act="open"'}>
       <b>${esc(r.name)}</b>
-      <span class="rrow-meta">${dots}${infos.length} ex · ~${fmtMin(estimate(r))}${last ? ` · ${relDate(last.date)}` : ''}</span>
+      <span class="rrow-meta">${dots}<span>${infos.length} ex · ~${fmtMin(estimate(r))}${last ? ` · ${relDate(last.date)}` : ''}</span></span>
     </button>
     ${sorting
       ? `<span class="grip" aria-label="Drag to reorder ${esc(r.name)}">${icon('grip')}</span>`
@@ -499,6 +511,8 @@ function relDate(iso) {
 
 function startRoutine(id) {
   audio.unlock();
+  const r = getRoutine(id);
+  stats.event('workout-start', r?.from ? EXPLORE.find((x) => x.id === r.from)?.name ?? 'Custom' : 'Custom');
   location.hash = `#/play/${id}`;
 }
 
@@ -806,7 +820,7 @@ function viewExplore(id) {
     const t = e.target.closest('[data-act]');
     if (!t) return;
     if (t.dataset.act === 'back') { history.length > 1 ? history.back() : (location.hash = '#/'); }
-    if (t.dataset.act === 'add') { const r = addCopy(); toast(`Added to My routines`); location.hash = `#/routine/${r.id}`; }
+    if (t.dataset.act === 'add') { const r = addCopy(); stats.event('explore-add', x.name); toast(`Added to My routines`); location.hash = `#/routine/${r.id}`; }
     if (t.dataset.act === 'open') location.hash = `#/routine/${mine().id}`;
     if (t.dataset.act === 'start') startRoutine((mine() ?? addCopy()).id);
   };
@@ -1142,6 +1156,7 @@ function viewSettings() {
     <section class="card settings">
       <h3>Your data</h3>
       <p class="muted">Routines and history are saved on this phone. Make a backup before switching phones.</p>
+      ${tog('stats', 'Share anonymous usage stats', 'Counts which screens are opened and workouts started — never your routines, history, or anything personal.')}
       <button class="btn ghost wide" data-act="export">Export backup</button>
       <label class="btn ghost wide file-btn">Import backup<input type="file" accept="application/json,.json" hidden></label>
       <button class="btn ghost wide" data-act="starters">Add starter routines</button>
@@ -1159,7 +1174,7 @@ function viewSettings() {
       save(); viewSettings();
       return;
     }
-    if (t.dataset.act === 'calendar') { addReminderToCalendar(S.reminder); return; }
+    if (t.dataset.act === 'calendar') { addReminderToCalendar(S.reminder); stats.event('reminder-added', `${S.reminder.days.length} days a week`); return; }
     if (t.dataset.units && t.dataset.units !== S.units) {
       // Convert weights already set on routine steps so they mean the same load.
       const f = t.dataset.units === 'kg' ? 1 / LB_PER_KG : LB_PER_KG;
@@ -1415,6 +1430,7 @@ function viewPlayer(id) {
     const secs = Math.round(sessionElapsed() / 1000);
     const lf = lifts();
     db.history.unshift({ id: uid(), routineId: r.id, name: r.name, date: new Date().toISOString(), seconds: secs, ...(lf.length ? { lifts: lf } : {}) });
+    stats.event('workout-finish', r.from ? EXPLORE.find((x) => x.id === r.from)?.name ?? 'Custom' : 'Custom');
     db.history = db.history.slice(0, 1000);
     save();
     say('Workout complete. Great job!');

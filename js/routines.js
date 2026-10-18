@@ -5,10 +5,93 @@
 const T = (ex, duration, extra = {}) => ({ ex, mode: 'time', duration, ...extra }); // timed
 const R = (ex, reps, sets = 1, extra = {}) => ({ ex, mode: 'reps', reps, sets, ...extra }); // reps
 
-export const GOALS = ['Stretch & Mobility', 'Strength', 'Cardio & HIIT', 'Core', 'Recovery', 'Desk & Travel'];
+export const GOALS = ['Full Workout', 'Stretch & Mobility', 'Strength', 'Cardio & HIIT', 'Core', 'Recovery', 'Desk & Travel'];
 export const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 
 export const EXPLORE = [
+  // ───────────── Full workouts (blends of stretch, bodyweight, weights and bands) ─────────────
+  {
+    id: 'x-complete', name: 'Complete Workout', goal: 'Full Workout', level: 'Intermediate', rest: 45,
+    desc: 'Everything in one session: a dynamic warm-up, full-body dumbbell strength, a core finisher, and a stretch to cool down.',
+    steps: [T('arm-circles', 30), T('leg-swings', 30), T('cat-cow', 40), T('jumping-jacks', 30),
+      R('goblet-squat', 10, 3), R('push-up', 10, 3), R('db-row', 10, 3), R('db-rdl', 10, 3), T('plank', 45),
+      T('low-lunge', 30), T('supine-hamstring', 30), T('figure-four', 30), T('chest-opener', 30), T('childs-pose', 45)],
+  },
+  {
+    id: 'x-mobility-core', name: 'Mobility & Core Flow', goal: 'Full Workout', level: 'Beginner', rest: 10,
+    desc: 'Stretches and core holds woven together, yoga-style. Moves you through every direction without any equipment.',
+    steps: [T('cat-cow', 40), R('bird-dog', 8), T('downward-dog', 30), T('plank', 30), T('low-lunge', 30), T('side-plank', 20), T('cobra', 30), R('dead-bug', 10), T('pigeon', 40), R('glute-bridge', 12), T('childs-pose', 45)],
+  },
+  {
+    id: 'x-bands-bodyweight', name: 'Bands & Bodyweight Circuit', goal: 'Full Workout', level: 'Beginner', rest: 15,
+    desc: 'Two rounds alternating bodyweight moves with band pulls and presses, then a short stretch. Only needs a band.',
+    steps: [R('squat', 12), R('band-row', 12), R('push-up', 8), R('band-deadlift', 12), R('reverse-lunge', 8), R('band-overhead-press', 10), T('mountain-climbers', 30), R('band-pull-apart', 15),
+      R('squat', 12), R('band-row', 12), R('push-up', 8), R('band-deadlift', 12), R('reverse-lunge', 8), R('band-overhead-press', 10), T('mountain-climbers', 30), R('band-pull-apart', 15),
+      T('doorway-chest', 30), T('standing-quad', 25), T('forward-fold', 30)],
+  },
+  {
+    id: 'x-hybrid', name: 'Hybrid Full Body', goal: 'Full Workout', level: 'Intermediate', rest: 45,
+    desc: 'Dumbbells, kettlebell, bands, and bodyweight in one balanced session — push, pull, legs, hinge, and core — finished with a stretch.',
+    steps: [T('marching', 45), T('arm-circles', 30), R('band-pull-apart', 15),
+      R('db-bench-press', 10, 3), R('band-row', 12, 3), R('goblet-squat', 10, 3), R('band-face-pull', 15, 2), R('db-lunge', 10, 2), R('kb-swing', 15, 3), R('dead-bug', 10, 2),
+      T('doorway-chest', 30), T('pigeon', 40), T('seated-forward-fold', 40), T('childs-pose', 45)],
+  },
+  {
+    id: 'x-strength-yoga', name: 'Strength & Yoga Blend', goal: 'Full Workout', level: 'Beginner', rest: 10,
+    desc: 'Bodyweight strength moves paired with the yoga stretch that opens up the same muscles.',
+    steps: [T('downward-dog', 30), R('push-up', 10), T('cobra', 30), R('squat', 15), T('low-lunge', 30), T('plank', 40), T('childs-pose', 30), R('glute-bridge', 15), T('pigeon', 40), T('triangle', 30), T('side-plank', 20), R('superman', 10), T('seated-forward-fold', 40), T('legs-up-wall', 60)],
+  },
+  {
+    id: 'x-upper-pump', name: 'Upper Body Pump + Stretch', goal: 'Full Workout', level: 'Intermediate', rest: 40,
+    desc: 'Chest, back, shoulders, and arms with dumbbells and a band, then stretch everything you worked.',
+    steps: [R('band-pull-apart', 15), T('arm-circles', 30),
+      R('push-up', 10, 3), R('db-row', 10, 3), R('db-shoulder-press', 10, 3), R('band-face-pull', 15, 2), R('db-curl', 12, 2), R('band-pushdown', 15, 2),
+      T('cross-body-shoulder', 30), T('overhead-triceps', 30), T('doorway-chest', 30), T('biceps-stretch', 20)],
+  },
+  {
+    id: 'x-legs-hips', name: 'Leg Day + Hip Mobility', goal: 'Full Workout', level: 'Intermediate', rest: 45,
+    desc: 'Heavy-ish legs with dumbbells and bands, then a long hip-opening cool-down.',
+    steps: [T('leg-swings', 30), T('knee-circles', 30),
+      R('goblet-squat', 10, 4), R('db-rdl', 10, 3), R('db-lunge', 10, 3), T('band-lateral-walk', 30, { sets: 2 }), R('band-glute-bridge', 15, 3), R('calf-raises', 15, 3),
+      T('low-lunge', 40), T('pigeon', 45), T('butterfly', 40), T('supine-hamstring', 40), T('figure-four', 40)],
+  },
+  {
+    id: 'x-runner-strength', name: "Runner's Strength & Mobility", goal: 'Full Workout', level: 'Beginner', rest: 20,
+    desc: 'Single-leg strength, glute and calf work, and core stability — the stuff that keeps runners healthy — plus a cool-down.',
+    steps: [T('leg-swings', 30), T('high-knees', 20),
+      R('reverse-lunge', 10, 2), R('side-lunge', 10, 2), R('band-glute-bridge', 15, 2), T('band-lateral-walk', 30), R('calf-raises', 20, 2), T('side-plank', 25), R('dead-bug', 10),
+      T('calf-stretch', 30), T('standing-quad', 30), T('figure-four', 40), T('supine-hamstring', 40)],
+  },
+  {
+    id: 'x-weekend-long', name: 'Long Weekend Session', goal: 'Full Workout', level: 'Intermediate', rest: 45,
+    desc: 'About an hour when you have time: long warm-up, full-body dumbbell strength, conditioning, core, and a full stretch.',
+    steps: [T('jumping-jacks', 60), T('arm-circles', 30), T('leg-swings', 30), T('cat-cow', 40), T('downward-dog', 30),
+      R('goblet-squat', 10, 3), R('db-bench-press', 10, 3), R('db-row', 10, 3), R('db-rdl', 10, 3), R('db-shoulder-press', 10, 3), R('db-lunge', 10, 2),
+      R('kb-swing', 15, 3), R('burpee', 8, 2), T('mountain-climbers', 30, { sets: 2 }),
+      T('plank', 45), T('side-plank', 30), T('hollow-hold', 30),
+      T('low-lunge', 40), T('pigeon', 45), T('seated-forward-fold', 45), T('chest-opener', 30), T('childs-pose', 60)],
+  },
+  {
+    id: 'x-total-training', name: 'Total Training (Barbell)', goal: 'Full Workout', level: 'Advanced', rest: 90,
+    desc: 'A long gym day (about 75 minutes): warm-up, heavy barbell squat, bench, and row, dumbbell accessories, core, and a cool-down stretch.',
+    steps: [T('jumping-jacks', 60), T('leg-swings', 30), T('arm-circles', 30), R('squat', 10), R('band-pull-apart', 15),
+      R('bb-back-squat', 5, 5, { setRest: 120 }), R('bb-bench-press', 5, 5, { setRest: 120 }), R('bb-row', 8, 3, { setRest: 90 }),
+      R('db-rdl', 10, 3), R('db-lateral-raise', 12, 3), R('db-curl', 12, 2), R('db-overhead-triceps', 12, 2),
+      R('leg-raises', 12, 2), T('plank', 60),
+      T('low-lunge', 40), T('pigeon', 45), T('doorway-chest', 30), T('supine-hamstring', 40), T('childs-pose', 60)],
+  },
+  {
+    id: 'x-desk-fix', name: 'Desk Worker Fix', goal: 'Full Workout', level: 'Beginner', rest: 15,
+    desc: 'Strengthen what sitting weakens (upper back, glutes, core) and stretch what it tightens (chest, hips, neck).',
+    steps: [R('band-pull-apart', 15, 2), R('band-face-pull', 15, 2), R('glute-bridge', 15, 2), R('bird-dog', 8), T('plank', 30),
+      T('doorway-chest', 30), T('low-lunge', 40), T('cobra', 30), T('neck-side', 25), T('levator-scapulae', 25)],
+  },
+  {
+    id: 'x-rotation', name: 'Golf & Rotation Ready', goal: 'Full Workout', level: 'Beginner', rest: 10,
+    desc: 'Twist-friendly mobility plus anti-rotation core work — good before a round of golf or any racket sport.',
+    steps: [T('torso-twist', 30), T('cross-touch-reach', 30), T('arm-circles', 30), T('standing-hip-opener', 20), R('band-pull-apart', 15), R('bird-dog', 8), T('side-plank', 25), T('lying-twist', 30), T('figure-four', 30), T('seated-twist', 30)],
+  },
+
   // ───────────── Stretch & mobility ─────────────
   {
     id: 'x-morning-wake-up', name: 'Morning Wake-Up', goal: 'Stretch & Mobility', level: 'Beginner', rest: 5,

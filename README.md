@@ -6,6 +6,7 @@ A guided stretching, calisthenics, free-weights, and resistance-band web app for
 - **Data:** stored on the device (localStorage). Use Settings → Export backup to move it.
 - **Explore:** 40 ready-made routines on the home screen (`js/routines.js`) with search, filters and sort; add any to My routines.
 - **Appearance:** Settings → Auto (follows the phone), Light, or Dark.
+- **Usage stats:** anonymous, via GoatCounter. Off until `GOATCOUNTER` in `js/analytics.js` is set to your site code; people can turn it off in Settings.
 - **Reminders:** Settings → Workout reminders adds a repeating event with an alert to the phone's calendar.
 - **Share a routine:** open a routine → ••• → Share routine. The link carries the whole routine.
 
