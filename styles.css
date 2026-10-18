@@ -611,3 +611,10 @@ body:has(.chat-input) #toast { bottom: calc(var(--safe-bottom) + 132px); }
 
 /* Big figure stages get the faint line texture over the spotlight; small thumbnails keep just the glow. */
 .ex-hero, .pl-stage, .step-preview, .like-preview, .coach-preview, .ex-thumb { background: var(--stage-tex), var(--stage-bg); }
+
+/* ── Feedback ── */
+.fb-link { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin: 18px 0 4px; padding: 10px; font-size: 14px; font-weight: 600; color: var(--text-2); }
+.fb-link .ic { width: 16px; height: 16px; }
+.fb .seg { margin-top: 0; }
+.fb textarea { resize: vertical; min-height: 110px; }
+.fb label .muted { font-weight: 400; }

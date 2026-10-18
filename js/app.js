@@ -153,6 +153,7 @@ const ICONS = {
   spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  flag: '<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>',
   auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17A8.5 8.5 0 0 0 12 3.5z" fill="currentColor"/>',
 };
 const icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
@@ -192,6 +193,72 @@ function menu(items) {
     s.close();
     items[+b.dataset.i]?.run();
   };
+}
+
+// ───────────────────────── Feedback ─────────────────────────
+
+// Feedback goes out as an email from the tester's own mail app, with what they were looking at attached.
+const FEEDBACK_EMAIL = '__EMAIL__';
+const FEEDBACK_KINDS = [['problem', 'Problem'], ['idea', 'Idea'], ['other', 'Other']];
+let lastScreen = '#/';
+
+async function appVersion() {
+  try { return (await caches.keys()).find((k) => k.startsWith('limber-'))?.replace('limber-', '') ?? 'dev'; } catch { return 'dev'; }
+}
+
+function deviceName() {
+  const ua = navigator.userAgent, ios = ua.match(/(iPhone|iPad|iPod).*? OS (\d+)_(\d+)/), android = ua.match(/Android ([\d.]+)/);
+  if (ios) return `${ios[1]} · iOS ${ios[2]}.${ios[3]}`;
+  if (android) return `Android ${android[1]}`;
+  return ua;
+}
+
+function screenName(hash) {
+  const [, page, id] = hash.match(/^#\/([\w]+)?(?:\/([\w-]+))?/) ?? [];
+  if (page === 'routine') return `Routine editor (${db.routines.find((r) => r.id === id)?.name ?? 'routine'})`;
+  if (page === 'exercise') return `Exercise: ${getEx(id)?.name ?? id}`;
+  if (page === 'explore') return `Explore: ${EXPLORE.find((r) => r.id === id)?.name ?? id}`;
+  if (page === 'play') return 'Workout player';
+  return { library: 'Exercises', history: 'History', settings: 'Settings', coach: 'Coach', custom: 'Custom exercise' }[page] ?? 'Routines (home)';
+}
+
+function openFeedback() {
+  let kind = 'problem';
+  const where = screenName(lastScreen);
+  const s = sheet(`
+    <div class="sheet-head"><h3>Send feedback</h3><button class="btn-icon" data-act="close" aria-label="Close">${icon('close')}</button></div>
+    <div class="form fb">
+      <div class="seg" role="radiogroup" aria-label="Kind of feedback">${FEEDBACK_KINDS.map(([k, l]) => `<button role="radio" data-kind="${k}" class="${k === kind ? 'on' : ''}" aria-checked="${k === kind}">${l}</button>`).join('')}</div>
+      <label>What happened?<textarea rows="5" placeholder="What you were doing, what you expected, and what went wrong."></textarea></label>
+      <label><span>Your name <span class="muted">(optional)</span></span><input type="text" autocomplete="name" placeholder="So I know who to thank"></label>
+      <p class="muted small">Your phone's mail app opens with this filled in, plus the app version, your phone model and the screen you were on (${esc(where)}). Nothing sends until you tap Send there.</p>
+      <button class="btn primary wide big" data-act="send" disabled>${icon('send', 'inline')} Write email</button>
+    </div>`);
+  const text = $('textarea', s.el), name = $('input', s.el), send = $('[data-act=send]', s.el);
+  text.oninput = () => { send.disabled = !text.value.trim(); };
+  s.el.onclick = async (e) => {
+    const t = e.target.closest('[data-kind],[data-act]');
+    if (!t) return;
+    if (t.dataset.act === 'close') { s.close(); return; }
+    if (t.dataset.kind) {
+      kind = t.dataset.kind;
+      $$('[data-kind]', s.el).forEach((b) => { b.classList.toggle('on', b === t); b.setAttribute('aria-checked', b === t); });
+      return;
+    }
+    if (t.dataset.act !== 'send' || !text.value.trim()) return;
+    const label = FEEDBACK_KINDS.find(([k]) => k === kind)[1];
+    const body = [text.value.trim(), '', name.value.trim() ? `From: ${name.value.trim()}` : '', '— Sent from Limber —',
+      `Screen: ${where}`, `Version: ${await appVersion()}`, `Device: ${deviceName()}`,
+      `Screen size: ${screen.width}×${screen.height}, ${isStandaloneApp() ? 'installed app' : 'browser'}, ${matchMedia('(prefers-color-scheme: dark)').matches && db.settings.theme !== 'light' || db.settings.theme === 'dark' ? 'dark' : 'light'} mode`,
+    ].filter((l, i) => l || i === 1).join('\n');
+    const first = text.value.trim().split('\n')[0];
+    const subject = `Limber ${label.toLowerCase()}: ${first.length > 50 ? `${first.slice(0, 50)}…` : first}`;
+    stats.event('feedback', label);
+    location.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    s.close();
+    toast('Thanks! Tap Send in Mail to finish.');
+  };
+  setTimeout(() => text.focus(), 300);
 }
 
 // ───────────────────────── Routine math ─────────────────────────
@@ -280,6 +347,7 @@ function render() {
       document.body.dataset.tab = tab;
       document.body.classList.toggle('playing', hash.startsWith('#/play'));
       cleanup = fn(...m.slice(1)) || null;
+      if (!hash.startsWith('#/settings')) lastScreen = hash;
       stats.pageview(hash);
       updateTabs(tab);
       return;
@@ -408,6 +476,7 @@ function viewRoutines() {
         </div>
         <div class="xlist"></div>
       </section>`}
+      ${sorting ? '' : `<button class="fb-link" data-act="feedback">${icon('flag', 'inline')} Something not right? Send feedback</button>`}
     `;
     if (mine) sortable($('.rlist', app), '.rrow', (from, to) => { move(db.routines, from, to); save(); draw(); });
     else {
@@ -430,6 +499,7 @@ function viewRoutines() {
     if (!t) return;
     const id = t.closest('[data-id]')?.dataset.id;
     if (t.dataset.act === 'sort') { sorting = !sorting; draw(); }
+    if (t.dataset.act === 'feedback') openFeedback();
     if (t.dataset.act === 'new') {
       const r = { id: uid(), name: 'New Routine', rest: 10, steps: [] };
       db.routines.unshift(r); save();
@@ -1302,6 +1372,11 @@ function viewSettings() {
   const tog = (k, label, sub) => `<label class="switch-row"><span>${label}${sub ? `<small>${sub}</small>` : ''}</span><button class="toggle ${S[k] ? 'on' : ''}" data-tog="${k}" role="switch" aria-checked="${!!S[k]}"><span></span></button></label>`;
   app.innerHTML = `
     <header class="top"><h1>Settings</h1></header>
+    <section class="card settings feedback-card">
+      <h3>Feedback</h3>
+      <p class="muted small">Found a problem or have an idea? Tell me. I read every one.</p>
+      <button class="btn primary wide" data-act="feedback">${icon('flag', 'inline')} Send feedback</button>
+    </section>
     <section class="card settings">
       <h3>Appearance</h3>
       <div class="seg theme-seg" role="radiogroup" aria-label="Appearance">${[['auto', 'Auto', 'auto'], ['light', 'Light', 'sun'], ['dark', 'Dark', 'moon']].map(([k, l, ic]) => `<button role="radio" aria-checked="${S.theme === k}" data-theme-pick="${k}" class="${S.theme === k ? 'on' : ''}">${icon(ic, 'inline')} ${l}</button>`).join('')}</div>
@@ -1374,6 +1449,7 @@ function viewSettings() {
       S[f] = Math.min(+t.dataset.max, Math.max(+t.dataset.min, S[f] + +t.dataset.inc));
       save(); viewSettings();
     }
+    if (t.dataset.act === 'feedback') { openFeedback(); return; }
     if (t.dataset.act === 'test') { audio.unlock(); audio.beep(660); setTimeout(() => audio.beep(990, 0.25), 300); if (S.voice) setTimeout(() => audio.speak('Voice guidance is on.'), 700); }
     if (t.dataset.act === 'export') {
       const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
