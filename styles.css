@@ -23,6 +23,10 @@
   --body: #e4e7ec;
   --muscle: #cfd4dc;
   --stage: #f1f5f9;
+  /* Behind the coach: a soft spotlight, white where she stands fading to cool gray at the edges. */
+  --stage-bg: radial-gradient(125% 100% at 50% 38%, #ffffff 0%, #f6f8fa 45%, #e6ebf1 100%);
+  /* Faint staggered gray lines laid over the big figure stages. */
+  --stage-tex: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='156'%20height='46'%3E%3Cg%20fill='rgb%2840,52,72%29'%20fill-opacity='.05'%3E%3Crect%20x='4'%20y='11'%20width='48'%20height='3'%20rx='1.5'/%3E%3Crect%20x='82'%20y='11'%20width='48'%20height='3'%20rx='1.5'/%3E%3Crect%20x='-35'%20y='34'%20width='48'%20height='3'%20rx='1.5'/%3E%3Crect%20x='43'%20y='34'%20width='48'%20height='3'%20rx='1.5'/%3E%3Crect%20x='121'%20y='34'%20width='48'%20height='3'%20rx='1.5'/%3E%3C/g%3E%3C/svg%3E");
   --radius: 18px;
   --shadow: 0 1px 2px rgba(20, 22, 27, .06), 0 4px 16px rgba(20, 22, 27, .05);
   --safe-top: env(safe-area-inset-top, 0px);
@@ -49,6 +53,7 @@
     --body: #262a33;
     --muscle: #343a45;
     --stage: #e6ecf1;
+    --stage-bg: radial-gradient(125% 100% at 50% 38%, #f7f9fb 0%, #e9eef3 45%, #d6dee6 100%);
     --shadow: none;
   }
 }
@@ -69,6 +74,7 @@
   --body: #262a33;
   --muscle: #343a45;
   --stage: #e6ecf1;
+  --stage-bg: radial-gradient(125% 100% at 50% 38%, #f7f9fb 0%, #e9eef3 45%, #d6dee6 100%);
   --shadow: none;
 }
 :root[data-theme="light"] { color-scheme: light; }
@@ -212,7 +218,7 @@ body.playing .tabbar { display: none; }
 .sort-select select { border: 0; background: transparent; color: var(--text); font-weight: 650; font-size: 14px; padding: 4px 0; }
 .xlist { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .xrow { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); padding: 6px 12px 6px 6px; }
-.x-thumb { width: 50px; height: 44px; flex: none; border-radius: 10px; background: var(--stage); overflow: hidden; }
+.x-thumb { width: 50px; height: 44px; flex: none; border-radius: 10px; background: var(--stage-bg); overflow: hidden; }
 .x-text { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .x-text b { font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .x-meta, .rrow-meta { display: flex; align-items: center; min-width: 0; font-size: 12.5px; color: var(--text-2); }
@@ -278,13 +284,13 @@ body.playing .tabbar { display: none; }
 .step-head { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 8px 0 8px 8px; text-align: left; }
 .step.open .step-row { background: color-mix(in srgb, var(--acc) 7%, transparent); }
 .step-num { width: 22px; text-align: center; font-size: 13px; font-weight: 700; color: var(--text-2); flex: none; }
-.step-thumb, .pick-thumb { width: 54px; height: 47px; flex: none; border-radius: 10px; background: var(--stage); overflow: hidden; }
+.step-thumb, .pick-thumb { width: 54px; height: 47px; flex: none; border-radius: 10px; background: var(--stage-bg); overflow: hidden; }
 .step-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .step-name { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .step-sum { font-size: 13px; color: var(--acc); font-weight: 600; }
 .step-body { padding: 10px 12px 12px; border-top: 1px solid var(--line); }
 .step-top { display: flex; gap: 10px; }
-.step-preview { width: 42%; max-width: 170px; aspect-ratio: 1.25; flex: none; border-radius: 12px; background: var(--stage); }
+.step-preview { width: 42%; max-width: 170px; aspect-ratio: 1.25; flex: none; border-radius: 12px; background: var(--stage-bg); }
 .step-side { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; }
 .step-side .seg { margin-top: 0; }
 .step-side .seg button { min-height: 30px; font-size: 13px; }
@@ -394,12 +400,12 @@ body.playing .tabbar { display: none; }
 /* ── Library ── */
 .ex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .ex-card { position: relative; display: flex; flex-direction: column; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); padding: 8px 8px 12px; }
-.ex-thumb { display: block; aspect-ratio: 1.25; border-radius: 10px; background: var(--stage); margin-bottom: 8px; }
+.ex-thumb { display: block; aspect-ratio: 1.25; border-radius: 10px; background: var(--stage-bg); margin-bottom: 8px; }
 .ex-name { font-weight: 650; font-size: 15px; line-height: 1.25; padding: 0 4px; }
 .ex-sub { font-size: 12.5px; color: var(--acc); font-weight: 600; padding: 2px 4px 0; }
 .tag { position: absolute; top: 12px; left: 12px; font-size: 11px; font-weight: 700; background: var(--surface); padding: 2px 7px; border-radius: 6px; }
 
-.ex-hero { aspect-ratio: 1.5; background: var(--stage); border-radius: var(--radius); box-shadow: var(--shadow); }
+.ex-hero { aspect-ratio: 1.5; background: var(--stage-bg); border-radius: var(--radius); box-shadow: var(--shadow); }
 .ex-title { margin: 16px 2px; }
 .ex-title h1 { font-size: 28px; font-weight: 800; margin: 8px 0 2px; }
 .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 12px; }
@@ -426,7 +432,7 @@ body.playing .tabbar { display: none; }
 .form fieldset { border: 0; padding: 0; margin: 0; }
 .form legend { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.like-preview { aspect-ratio: 1.8; background: var(--stage); border-radius: 14px; }
+.like-preview { aspect-ratio: 1.8; background: var(--stage-bg); border-radius: 14px; }
 
 /* ── History ── */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 10px; margin-bottom: 14px; }
@@ -485,7 +491,7 @@ body.playing .tabbar { display: none; }
 .hint.nudge { background: color-mix(in srgb, var(--strength) 14%, var(--surface)); }
 .settings .switch-row { border-bottom: 1px solid var(--line); }
 .coach-row { display: flex; gap: 14px; align-items: center; }
-.coach-preview { width: 110px; aspect-ratio: 0.9; flex: none; border-radius: 14px; background: var(--stage); }
+.coach-preview { width: 110px; aspect-ratio: 0.9; flex: none; border-radius: 14px; background: var(--stage-bg); }
 .coach-pick { flex: 1; display: grid; gap: 14px; }
 .swatches { display: flex; gap: 10px; }
 .swatch { width: 36px; height: 36px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); }
@@ -530,7 +536,7 @@ body.playing #app { padding: 0; max-width: none; }
 .pl-chips { display: flex; justify-content: center; gap: 6px; min-height: 30px; }
 .pl-chips .chip { padding: 4px 12px; font-size: 13px; }
 .pl-chips .chip.on { background: var(--acc); color: #fff; }
-.pl-stage { position: relative; flex: 1; min-height: 160px; margin: 8px 0 4px; background: var(--stage); border-radius: 22px; overflow: hidden; }
+.pl-stage { position: relative; flex: 1; min-height: 160px; margin: 8px 0 4px; background: var(--stage-bg); border-radius: 22px; overflow: hidden; }
 .pl-fig, .pl-map { position: absolute; inset: 10px; transition: opacity .3s; }
 .pl-fig.dim { opacity: .45; }
 .pl-map { display: flex; justify-content: center; }
@@ -596,3 +602,6 @@ body.playing #app { padding: 0; max-width: none; }
 
 /* On the Coach screen, keep toasts above the message box. */
 body:has(.chat-input) #toast { bottom: calc(var(--safe-bottom) + 132px); }
+
+/* Big figure stages get the faint line texture over the spotlight; small thumbnails keep just the glow. */
+.ex-hero, .pl-stage, .step-preview, .like-preview, .coach-preview, .ex-thumb { background: var(--stage-tex), var(--stage-bg); }
