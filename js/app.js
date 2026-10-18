@@ -153,6 +153,7 @@ const ICONS = {
   spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  blank: '',
   flag: '<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>',
   auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17A8.5 8.5 0 0 0 12 3.5z" fill="currentColor"/>',
 };
@@ -431,9 +432,9 @@ function viewRoutines() {
   const figs = [];
   const drawExplore = () => {
     figs.splice(0).forEach((f) => f.stop());
-    $('.fwrap', app).innerHTML = filterBar(exploreState, EXPLORE_FILTERS);
     const items = exploreResults();
-    $('.x-count', app).textContent = `${items.length} routine${items.length === 1 ? '' : 's'}`;
+    const sortChip = `<button class="chip more sort" data-act="xsort" aria-label="Sort routines">${icon('sort', 'inline')} ${{ short: 'Shortest', long: 'Longest', easy: 'Easiest' }[exploreSort] ?? SORTS.find(([k]) => k === exploreSort)[1]}</button>`;
+    $('.fwrap', app).innerHTML = filterBar(exploreState, EXPLORE_FILTERS, `${items.length} routine${items.length === 1 ? '' : 's'}`, sortChip);
     $('.xlist', app).innerHTML = items.map(({ r, secs, gear }) => {
       const added = db.routines.some((m) => m.from === r.id);
       return `<a class="xrow" href="#/explore/${r.id}" style="--acc:${typeVar(getEx(r.steps[0].ex)?.type)}">
@@ -471,9 +472,6 @@ function viewRoutines() {
         <a class="coach-cta" href="#/coach">${icon('spark')}<span><b>Not sure what to do?</b><span>Tell the Coach what's bothering you and get a routine built for you.</span></span>${icon('back', 'x-chev')}</a>
         <div class="search">${icon('search')}<input type="search" placeholder="Search routines or exercises" value="${esc(exploreQuery)}" aria-label="Search routines"></div>
         <div class="fwrap"></div>
-        <div class="x-tools"><span class="x-count muted small"></span>
-          <label class="sort-select">${icon('sort', 'inline')}<select aria-label="Sort routines">${SORTS.map(([k, l]) => `<option value="${k}" ${k === exploreSort ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-        </div>
         <div class="xlist"></div>
       </section>`}
       ${sorting ? '' : `<button class="fb-link" data-act="feedback">${icon('flag', 'inline')} Something not right? Send feedback</button>`}
@@ -482,7 +480,6 @@ function viewRoutines() {
     else {
       drawExplore();
       $('.explore input', app).addEventListener('input', (e) => { exploreQuery = e.target.value; drawExplore(); });
-      $('.explore select', app).addEventListener('change', (e) => { exploreSort = e.target.value; drawExplore(); });
     }
   };
   draw();
@@ -500,6 +497,7 @@ function viewRoutines() {
     const id = t.closest('[data-id]')?.dataset.id;
     if (t.dataset.act === 'sort') { sorting = !sorting; draw(); }
     if (t.dataset.act === 'feedback') openFeedback();
+    if (t.dataset.act === 'xsort') menu(SORTS.map(([k, l]) => ({ icon: k === exploreSort ? 'check' : 'blank', label: l, run: () => { exploreSort = k; drawExplore(); } })));
     if (t.dataset.act === 'new') {
       const r = { id: uid(), name: 'New Routine', rest: 10, steps: [] };
       db.routines.unshift(r); save();
@@ -805,13 +803,14 @@ const EX_FILTERS = [
   { key: 'area', label: 'Body area', options: Object.entries(AREAS).map(([k, a]) => [k, a.label]) },
 ];
 
-function filterBar(state, groups, count = '') {
+function filterBar(state, groups, count = '', extra = '') {
   const active = groups.filter((g) => state[g.key] !== 'all');
   const label = (g, v) => g.options.find(([x]) => x === v)?.[1] ?? v;
   return `<div class="fbar">
       <button class="chip ${active.length ? '' : 'on'}" data-fb="all">All</button>
       ${active.map((g) => `<button class="chip on removable" data-fb-clear="${g.key}" aria-label="Remove ${esc(label(g, state[g.key]))} filter">${esc(label(g, state[g.key]))}${icon('close', 'x')}</button>`).join('')}
       ${count ? `<span class="fb-count muted small">${count}</span>` : ''}
+      ${extra}
       <button class="chip more ${state.open ? 'open' : ''}" data-fb="toggle" aria-expanded="${state.open}">${icon('filter', 'inline')} ${state.open ? 'Hide filters' : 'Filters'}</button>
     </div>
     ${state.open ? `<div class="fpanel">${groups.map((g) => `<div class="fgroup"><span class="fgroup-l">${g.label}</span><div class="chips wrap">${[['all', 'Any'], ...g.options].map(([v, l]) => `<button class="chip ${state[g.key] === v ? 'on' : ''}" data-fb-set="${g.key}" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`).join('')}</div>` : ''}`;
