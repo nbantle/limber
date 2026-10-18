@@ -1,7 +1,7 @@
 // Anonymous usage stats via GoatCounter (https://www.goatcounter.com): no cookies, no personal data,
 // nothing from your routines or history — just which screens are opened and a few events.
 // Off until GOATCOUNTER is set to the site code (e.g. 'limber' for https://limber.goatcounter.com).
-export const GOATCOUNTER = '';
+export const GOATCOUNTER = 'nbantle';
 
 let allowed = () => true;
 export const setAllowed = (fn) => { allowed = fn; };
