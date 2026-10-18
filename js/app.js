@@ -276,7 +276,7 @@ function render() {
     const m = hash.match(re);
     if (m) {
       const tab = hash.startsWith('#/library') || hash.startsWith('#/exercise') || hash.startsWith('#/custom') ? 'library'
-        : hash.startsWith('#/history') ? 'history' : hash.startsWith('#/settings') ? 'settings' : 'routines';
+        : hash.startsWith('#/history') ? 'history' : hash.startsWith('#/settings') ? 'settings' : hash.startsWith('#/coach') ? 'coach' : 'routines';
       document.body.dataset.tab = tab;
       document.body.classList.toggle('playing', hash.startsWith('#/play'));
       cleanup = fn(...m.slice(1)) || null;
@@ -952,7 +952,7 @@ function viewCoach() {
     const last = coachChat.msgs.length - 1;
     const resultIdx = coachChat.msgs.map((m) => !!m.result).lastIndexOf(true);
     app.innerHTML = `
-      <header class="top"><a class="btn-icon" href="#/" aria-label="Back">${icon('back')}</a><div class="top-title">Coach</div><button class="btn-icon" data-act="restart" aria-label="Start over">${icon('edit')}</button></header>
+      <header class="top"><h1>Coach</h1><button class="btn small" data-act="restart">${icon('edit', 'inline')} New chat</button></header>
       <p class="coach-note muted small">The Coach builds routines from Limber's exercise library using built-in rules. It isn't a medical professional.</p>
       <div class="chat">${coachChat.msgs.map((m, i) => `
         <div class="msg ${m.from}">${m.html}</div>
