@@ -1,4 +1,5 @@
 import { EXERCISES, STARTER_ROUTINES, MUSCLES, AREAS } from './exercises.js';
+import { EXPLORE, GOALS, LEVELS } from './routines.js';
 import { renderFigure, BAND_COLORS } from './figure.js';
 import { COACHES, SKINS, setLook } from './character2.js';
 import { muscleMapSVG } from './muscles.js';
@@ -7,7 +8,7 @@ import { audio, wakeLock } from './audio.js';
 // ───────────────────────── Storage ─────────────────────────
 
 const KEY = 'limber.v1';
-const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5, coach: 'a', skin: 1, units: 'lb', reminder: { days: [], time: '07:00' } };
+const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5, coach: 'a', skin: 1, units: 'lb', reminder: { days: [], time: '07:00' }, theme: 'auto' };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -28,7 +29,18 @@ function normalize() {
   db.history ??= [];
   db.settings = { ...DEFAULT_SETTINGS, ...db.settings };
   setLook(db.settings.coach, db.settings.skin);
+  applyTheme(db.settings.theme);
 }
+// Appearance: 'auto' follows the phone's light/dark setting (which iOS can switch at sunset); 'light'/'dark' force it.
+function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'light' || theme === 'dark') root.dataset.theme = theme; else delete root.dataset.theme;
+  try { localStorage.setItem('limber.theme', theme); } catch { /* ignore */ }
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+    m.content = theme === 'dark' ? '#0e1014' : theme === 'light' ? '#f5f6f8' : (m.media.includes('dark') ? '#0e1014' : '#f5f6f8');
+  });
+}
+
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { toast('Could not save — storage is full or blocked'); }
 }
@@ -62,7 +74,6 @@ const TYPES = {
 };
 const typeVar = (t) => (TYPES[t] ?? TYPES.stretch).color;
 const typeLabel = (t) => (TYPES[t] ?? TYPES.stretch).label;
-const typeChips = (on) => ['all', ...Object.keys(TYPES)].map((f) => `<button class="chip ${f === on ? 'on' : ''}" data-f="${f}">${f === 'all' ? 'All' : TYPES[f].plural}</button>`).join('');
 
 // Weights are stored in the units chosen in Settings; built-in defaults are in pounds.
 const LB_PER_KG = 2.2046;
@@ -129,6 +140,10 @@ const ICONS = {
   body: '<circle cx="12" cy="4.5" r="2"/><path d="M5 9h14M12 9v6M9 21l3-6 3 6"/>',
   grip: '<circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
   sort: '<path d="M7 4v16M3.5 7.5L7 4l3.5 3.5M17 20V4M13.5 16.5L17 20l3.5-3.5"/>',
+  filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17A8.5 8.5 0 0 0 12 3.5z" fill="currentColor"/>',
 };
 const icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
 
@@ -239,6 +254,7 @@ const routes = [
   [/^#\/settings$/, viewSettings],
   [/^#\/play\/([\w-]+)$/, viewPlayer],
   [/^#\/import\/(.+)$/, viewImport],
+  [/^#\/explore\/([\w-]+)$/, viewExplore],
 ];
 
 function render() {
@@ -269,10 +285,71 @@ function updateTabs(tab) {
 
 const isStandalone = () => window.navigator.standalone || window.matchMedia?.('(display-mode: standalone)').matches;
 
+// Home: My routines (compact rows) and Explore — ready-made routines with search, filters and sort.
+const exploreState = { open: false, goal: 'all', gear: 'all', level: 'all' };
+let exploreQuery = '', exploreSort = 'recommended';
+
+const GEAR = ['No equipment', 'Dumbbells', 'Kettlebell', 'Barbell', 'Bands', 'Pull-up bar', 'Chair or bench'];
+const EXPLORE_FILTERS = [
+  { key: 'goal', label: 'Goal', options: GOALS.map((g) => [g, g]) },
+  { key: 'gear', label: 'Equipment', options: GEAR.map((g) => [g, g]) },
+  { key: 'level', label: 'Level', options: LEVELS.map((l) => [l, l]) },
+];
+const SORTS = [['recommended', 'Recommended'], ['short', 'Shortest first'], ['long', 'Longest first'], ['easy', 'Easiest first'], ['name', 'A–Z']];
+
+// What you need for a routine, worked out from its exercises.
+function routineGear(r) {
+  const tags = new Set();
+  for (const st of r.steps) {
+    const ex = getEx(st.ex);
+    if (!ex) continue;
+    const e = (ex.equipment ?? '').toLowerCase();
+    if (ex.type === 'bands') tags.add('Bands');
+    if (e.includes('barbell')) tags.add('Barbell');
+    if (ex.id.startsWith('kb-')) tags.add('Kettlebell');
+    if (e.includes('dumbbell')) tags.add('Dumbbells');
+    if (e.includes('pull-up')) tags.add('Pull-up bar');
+    if (e.includes('chair') || e.includes('bench')) tags.add('Chair or bench');
+  }
+  return tags.size ? GEAR.filter((g) => tags.has(g)) : ['No equipment'];
+}
+
+function exploreResults() {
+  const q = exploreQuery.trim().toLowerCase();
+  const S = exploreState;
+  const list = EXPLORE.map((r, i) => ({ r, i, secs: estimate(r), gear: routineGear(r) })).filter(({ r, gear }) =>
+    (S.goal === 'all' || r.goal === S.goal) && (S.level === 'all' || r.level === S.level) && (S.gear === 'all' || gear.includes(S.gear)) &&
+    (!q || [r.name, r.desc, r.goal, r.level, ...gear, ...r.steps.map((st) => getEx(st.ex)?.name ?? '')].some((x) => x.toLowerCase().includes(q))));
+  const by = {
+    recommended: (a, b) => a.i - b.i,
+    short: (a, b) => a.secs - b.secs,
+    long: (a, b) => b.secs - a.secs,
+    easy: (a, b) => LEVELS.indexOf(a.r.level) - LEVELS.indexOf(b.r.level) || a.secs - b.secs,
+    name: (a, b) => a.r.name.localeCompare(b.r.name),
+  };
+  return list.sort(by[exploreSort]);
+}
+
 function viewRoutines() {
   const hintDismissed = (() => { try { return localStorage.getItem('limber.hint') === '1'; } catch { return false; } })();
   const showHint = !isStandalone() && !hintDismissed && /iPhone|iPad|iPod/.test(navigator.userAgent);
   let sorting = false;
+  const figs = [];
+  const drawExplore = () => {
+    figs.splice(0).forEach((f) => f.stop());
+    $('.fwrap', app).innerHTML = filterBar(exploreState, EXPLORE_FILTERS);
+    const items = exploreResults();
+    $('.x-count', app).textContent = `${items.length} routine${items.length === 1 ? '' : 's'}`;
+    $('.xlist', app).innerHTML = items.map(({ r, secs, gear }) => {
+      const added = db.routines.some((m) => m.from === r.id);
+      return `<a class="xrow" href="#/explore/${r.id}" style="--acc:${typeVar(getEx(r.steps[0].ex)?.type)}">
+        <span class="x-thumb" data-ex="${r.steps[0].ex}"></span>
+        <span class="x-text"><b>${esc(r.name)}</b><span>${r.level} · ~${fmtMin(secs)} · ${esc(gear.join(', '))}</span></span>
+        ${added ? `<span class="x-added" aria-label="In My routines">${icon('check')}</span>` : icon('back', 'x-chev')}
+      </a>`;
+    }).join('') || '<p class="muted pad center">No routines match. Try clearing a filter.</p>';
+    $$('.x-thumb', app).forEach((el) => figs.push(renderFigure(el, getEx(el.dataset.ex), { animate: false, aspect: 1.15, arrows: false })));
+  };
   const draw = () => {
     app.innerHTML = `
       <header class="top">
@@ -286,15 +363,31 @@ function viewRoutines() {
       </header>
       ${showHint && !sorting ? `<div class="hint"><div><strong>Install Limber</strong><p>Tap the Share button ${icon('share', 'inline')} then <b>Add to Home Screen</b> to use it like an app. Routines you make in the installed app stay there.</p></div><button class="btn-icon" data-act="hint" aria-label="Dismiss">${icon('close')}</button></div>` : ''}
       ${sorting ? '<p class="muted small sort-tip">Drag the handles to reorder.</p>' : workoutDayNudge()}
-      <div class="cards ${sorting ? 'sorting-mode' : ''}">
-        ${db.routines.length ? db.routines.map((r) => routineCard(r, sorting)).join('') : `<div class="empty"><p>No routines yet.</p><button class="btn primary" data-act="new">Create a routine</button></div>`}
+      <div class="sec-head"><h2>My routines</h2><span class="muted small">${db.routines.length}</span></div>
+      <div class="rlist ${sorting ? 'sorting-mode' : ''}">
+        ${db.routines.length ? db.routines.map((r) => routineCard(r, sorting)).join('') : `<div class="empty small"><p>No routines yet. Make your own, or add one from Explore below.</p><button class="btn primary small" data-act="new">Create a routine</button></div>`}
       </div>
-      ${db.routines.length && !sorting ? `<button class="btn ghost wide" data-act="new">${icon('plus')} New routine</button>` : ''}
+      ${sorting ? '' : `
+      <section class="explore">
+        <div class="sec-head"><h2>Explore</h2><span class="muted small">${EXPLORE.length} routines</span></div>
+        <div class="search">${icon('search')}<input type="search" placeholder="Search routines or exercises" value="${esc(exploreQuery)}" aria-label="Search routines"></div>
+        <div class="fwrap"></div>
+        <div class="x-tools"><span class="x-count muted small"></span>
+          <label class="sort-select">${icon('sort', 'inline')}<select aria-label="Sort routines">${SORTS.map(([k, l]) => `<option value="${k}" ${k === exploreSort ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        </div>
+        <div class="xlist"></div>
+      </section>`}
     `;
-    sortable($('.cards', app), '.rcard', (from, to) => { move(db.routines, from, to); save(); draw(); });
+    sortable($('.rlist', app), '.rrow', (from, to) => { move(db.routines, from, to); save(); draw(); });
+    if (!sorting) {
+      drawExplore();
+      $('.explore input', app).addEventListener('input', (e) => { exploreQuery = e.target.value; drawExplore(); });
+      $('.explore select', app).addEventListener('change', (e) => { exploreSort = e.target.value; drawExplore(); });
+    }
   };
   draw();
   app.onclick = (e) => {
+    if (filterClick(e, exploreState)) { drawExplore(); return; }
     const t = e.target.closest('[data-act]');
     if (!t) return;
     const id = t.closest('[data-id]')?.dataset.id;
@@ -309,6 +402,7 @@ function viewRoutines() {
     if (t.dataset.act === 'nudge') { try { localStorage.setItem('limber.nudge', new Date().toDateString()); } catch { /* ignore */ } t.closest('.hint').remove(); }
     if (t.dataset.act === 'hint') { try { localStorage.setItem('limber.hint', '1'); } catch { /* ignore */ } t.closest('.hint').remove(); }
   };
+  return () => figs.forEach((f) => f.stop());
 }
 
 // On a reminder day with no workout yet, a gentle banner on the home screen.
@@ -319,20 +413,19 @@ function workoutDayNudge() {
   return `<div class="hint nudge"><div><strong>It's a workout day</strong><p>Pick a routine below and press play.</p></div><button class="btn-icon" data-act="nudge" aria-label="Dismiss">${icon('close')}</button></div>`;
 }
 
+// Compact My routines row: name, a one-line summary with type dots, and play (or a drag handle while reordering).
 function routineCard(r, sorting = false) {
   const infos = r.steps.map(stepInfo).filter(Boolean);
-  const mix = Object.entries(TYPES).map(([k, t]) => [k, t, infos.filter((i) => (TYPES[i.ex.type] ? i.ex.type : 'stretch') === k).length])
-    .filter(([, , n]) => n).map(([k, t, n]) => `<span class="pill ${k}">${n} ${t.count}</span>`).join('');
+  const dots = Object.keys(TYPES).filter((k) => infos.some((i) => i.ex.type === k)).map((k) => `<i class="tdot" style="background:${TYPES[k].color}" title="${TYPES[k].label}"></i>`).join('');
   const last = db.history.find((h) => h.routineId === r.id);
-  return `<article class="rcard" data-id="${r.id}">
-    <button class="rcard-main" ${sorting ? 'tabindex="-1"' : 'data-act="open"'}>
-      <h2>${esc(r.name)}</h2>
-      <p class="meta">${infos.length} exercise${infos.length === 1 ? '' : 's'} · ~${fmtMin(estimate(r))}${last ? ` · last done ${relDate(last.date)}` : ''}</p>
-      <div class="mix">${mix}</div>
+  return `<article class="rrow" data-id="${r.id}">
+    <button class="rrow-main" ${sorting ? 'tabindex="-1"' : 'data-act="open"'}>
+      <b>${esc(r.name)}</b>
+      <span class="rrow-meta">${dots}${infos.length} ex · ~${fmtMin(estimate(r))}${last ? ` · ${relDate(last.date)}` : ''}</span>
     </button>
     ${sorting
       ? `<span class="grip" aria-label="Drag to reorder ${esc(r.name)}">${icon('grip')}</span>`
-      : `<button class="play-btn" data-act="play" aria-label="Start ${esc(r.name)}" ${infos.length ? '' : 'disabled'}>${icon('play')}</button>`}
+      : `<button class="play-btn sm" data-act="play" aria-label="Start ${esc(r.name)}" ${infos.length ? '' : 'disabled'}>${icon('play')}</button>`}
   </article>`;
 }
 
@@ -555,18 +648,19 @@ function stepRow(s, i, n, isOpen, routineRest) {
 
 // Exercise picker sheet: tap to add to routine.
 function pickExercises(routine, onDone) {
-  let filter = 'all', q = '', area = 'all';
+  const fs = { open: false, type: 'all', area: 'all' };
+  let q = '';
   const figs = [];
   const s = sheet(`
     <div class="sheet-head"><h3>Add exercises</h3><button class="btn small primary" data-act="done">Done</button></div>
     <div class="search">${icon('search')}<input type="search" placeholder="Search exercises or muscles" aria-label="Search"></div>
-    <div class="chips" role="group">${typeChips('all')}</div>
-    ${areaChips('all')}
+    <div class="fwrap"></div>
     <div class="pick-list"></div>`, { cls: 'tall', onClose: () => { figs.forEach((f) => f.stop()); onDone(); } });
   const list = $('.pick-list', s.el);
   const draw = () => {
     figs.splice(0).forEach((f) => f.stop());
-    const items = filterExercises(allExercises(), filter, q, area);
+    $('.fwrap', s.el).innerHTML = filterBar(fs, EX_FILTERS);
+    const items = filterExercises(allExercises(), fs.type, q, fs.area);
     list.innerHTML = items.map((ex) => `<button class="pick" data-id="${ex.id}" style="--acc:${typeVar(ex.type)}">
       <span class="pick-thumb" data-ex="${ex.id}"></span>
       <span class="pick-text"><span class="pick-name">${esc(ex.name)}</span><span class="pick-sub">${esc(muscleNames(ex.primary))}</span></span>
@@ -574,9 +668,7 @@ function pickExercises(routine, onDone) {
     $$('.pick-thumb', list).forEach((el) => figs.push(renderFigure(el, getEx(el.dataset.ex), { animate: false, aspect: 1.15 })));
   };
   s.el.addEventListener('click', (e) => {
-    const c = e.target.closest('.chip');
-    if (c?.dataset.area) { area = c.dataset.area; $$('[data-area]', s.el).forEach((x) => x.classList.toggle('on', x === c)); draw(); return; }
-    if (c) { filter = c.dataset.f; $$('[data-f]', s.el).forEach((x) => x.classList.toggle('on', x === c)); draw(); return; }
+    if (filterClick(e, fs)) { draw(); return; }
     if (e.target.closest('[data-act="done"]')) { s.close(); return; }
     const p = e.target.closest('.pick');
     if (p) {
@@ -591,7 +683,36 @@ function pickExercises(routine, onDone) {
   draw();
 }
 
-const areaChips = (area) => `<div class="chips area-chips" role="group" aria-label="Body area">${[['all', 'Whole body'], ...Object.entries(AREAS).map(([k, a]) => [k, a.label])].map(([k, l]) => `<button class="chip ${k === area ? 'on' : ''}" data-area="${k}">${l}</button>`).join('')}</div>`;
+// ───────────────────────── Filters ─────────────────────────
+// "All", the active filters, and a Filters button that opens wrapping chip groups — nothing scrolls sideways.
+// state: { open, [group key]: value | 'all' }; groups: [{ key, label, options: [[value, label], ...] }].
+
+const EX_FILTERS = [
+  { key: 'type', label: 'Type', options: Object.entries(TYPES).map(([k, t]) => [k, t.plural]) },
+  { key: 'area', label: 'Body area', options: Object.entries(AREAS).map(([k, a]) => [k, a.label]) },
+];
+
+function filterBar(state, groups) {
+  const active = groups.filter((g) => state[g.key] !== 'all');
+  const label = (g, v) => g.options.find(([x]) => x === v)?.[1] ?? v;
+  return `<div class="fbar">
+      <button class="chip ${active.length ? '' : 'on'}" data-fb="all">All</button>
+      ${active.map((g) => `<button class="chip on removable" data-fb-clear="${g.key}" aria-label="Remove ${esc(label(g, state[g.key]))} filter">${esc(label(g, state[g.key]))}${icon('close', 'x')}</button>`).join('')}
+      <button class="chip more ${state.open ? 'open' : ''}" data-fb="toggle" aria-expanded="${state.open}">${icon('filter', 'inline')} ${state.open ? 'Hide filters' : 'Filters'}</button>
+    </div>
+    ${state.open ? `<div class="fpanel">${groups.map((g) => `<div class="fgroup"><span class="fgroup-l">${g.label}</span><div class="chips wrap">${[['all', 'Any'], ...g.options].map(([v, l]) => `<button class="chip ${state[g.key] === v ? 'on' : ''}" data-fb-set="${g.key}" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`).join('')}</div>` : ''}`;
+}
+
+// Applies a click inside a filter bar to state. Returns true if it was a filter click.
+function filterClick(e, state) {
+  const b = e.target.closest('[data-fb],[data-fb-clear],[data-fb-set]');
+  if (!b) return false;
+  if (b.dataset.fb === 'toggle') state.open = !state.open;
+  else if (b.dataset.fb === 'all') { for (const k in state) if (k !== 'open') state[k] = 'all'; }
+  else if (b.dataset.fbClear) state[b.dataset.fbClear] = 'all';
+  else state[b.dataset.fbSet] = b.dataset.v;
+  return true;
+}
 
 function filterExercises(list, filter, q, area = 'all') {
   q = q.trim().toLowerCase();
@@ -646,23 +767,70 @@ function viewImport(data) {
   };
 }
 
+// Explore routine preview: what's in it, then add it to My routines or start right away.
+function viewExplore(id) {
+  const x = EXPLORE.find((r) => r.id === id);
+  if (!x) { location.hash = '#/'; return; }
+  const figs = [];
+  const mine = () => db.routines.find((m) => m.from === x.id);
+  const addCopy = () => {
+    const r = { id: uid(), from: x.id, name: x.name, rest: x.rest ?? 10, steps: x.steps.map((st) => ({ ...clone(st), id: uid() })) };
+    db.routines.unshift(r);
+    save();
+    return r;
+  };
+  const steps = x.steps.filter((st) => getEx(st.ex));
+  const secs = estimate(x);
+  app.innerHTML = `
+    <header class="top"><button class="btn-icon" data-act="back" aria-label="Back">${icon('back')}</button><div class="top-title">Explore</div><span></span></header>
+    <h1 class="title-static">${esc(x.name)}</h1>
+    <p class="x-desc">${esc(x.desc)}</p>
+    <div class="x-facts">
+      <div><b>~${fmtMin(secs)}</b><span>long</span></div>
+      <div><b>${steps.length}</b><span>exercises</span></div>
+      <div><b>${x.level}</b><span>level</span></div>
+    </div>
+    <div class="x-tags"><span class="pill">${esc(x.goal)}</span>${routineGear(x).map((g) => `<span class="pill">${esc(g)}</span>`).join('')}</div>
+    <ol class="x-steps">${steps.map((st, i) => {
+      const ex = getEx(st.ex);
+      return `<li style="--acc:${typeVar(ex.type)}"><a href="#/exercise/${ex.id}">
+        <span class="step-num">${i + 1}</span><span class="step-thumb" data-ex="${ex.id}"></span>
+        <span class="step-text"><span class="step-name">${esc(ex.name)}</span><span class="step-sum">${stepSummary(st)}</span></span></a></li>`;
+    }).join('')}</ol>
+    <div class="bottom-cta x-cta">
+      ${mine() ? `<button class="btn wide" data-act="open">${icon('check')} In My routines — open</button>` : `<button class="btn wide" data-act="add">${icon('plus')} Add to My routines</button>`}
+      <button class="btn primary wide big" data-act="start">${icon('play')} Start now</button>
+    </div>`;
+  $$('.step-thumb', app).forEach((el) => figs.push(renderFigure(el, getEx(el.dataset.ex), { animate: false, aspect: 1.15, arrows: false })));
+  app.onclick = (e) => {
+    const t = e.target.closest('[data-act]');
+    if (!t) return;
+    if (t.dataset.act === 'back') { history.length > 1 ? history.back() : (location.hash = '#/'); }
+    if (t.dataset.act === 'add') { const r = addCopy(); toast(`Added to My routines`); location.hash = `#/routine/${r.id}`; }
+    if (t.dataset.act === 'open') location.hash = `#/routine/${mine().id}`;
+    if (t.dataset.act === 'start') startRoutine((mine() ?? addCopy()).id);
+  };
+  return () => figs.forEach((f) => f.stop());
+}
+
 // ───────────────────────── Library ─────────────────────────
 
-let libFilter = 'all', libQuery = '', libArea = 'all';
+const libState = { open: false, type: 'all', area: 'all' };
+let libQuery = '';
 
 function viewLibrary() {
   const figs = [];
   app.innerHTML = `
     <header class="top"><h1>Exercises</h1><a class="btn-icon accent" href="#/custom/new" aria-label="New custom exercise">${icon('plus')}</a></header>
     <div class="search">${icon('search')}<input type="search" placeholder="Search exercises or muscles" value="${esc(libQuery)}" aria-label="Search"></div>
-    <div class="chips">${typeChips(libFilter)}</div>
-    ${areaChips(libArea)}
+    <div class="fwrap"></div>
     <p class="lib-count muted small"></p>
     <div class="ex-grid"></div>`;
   const grid = $('.ex-grid', app);
   const draw = () => {
     figs.splice(0).forEach((f) => f.stop());
-    const items = filterExercises(allExercises(), libFilter, libQuery, libArea);
+    $('.fwrap', app).innerHTML = filterBar(libState, EX_FILTERS);
+    const items = filterExercises(allExercises(), libState.type, libQuery, libState.area);
     $('.lib-count', app).textContent = `${items.length} exercise${items.length === 1 ? '' : 's'}`;
     grid.innerHTML = items.map((ex) => `<a class="ex-card" href="#/exercise/${ex.id}" style="--acc:${typeVar(ex.type)}">
       <span class="ex-thumb" data-ex="${ex.id}"></span>
@@ -672,11 +840,7 @@ function viewLibrary() {
     </a>`).join('') || '<p class="muted pad">No matches.</p>';
     $$('.ex-thumb', grid).forEach((el) => figs.push(renderFigure(el, getEx(el.dataset.ex), { animate: false, aspect: 1.25 })));
   };
-  app.onclick = (e) => {
-    const c = e.target.closest('.chip');
-    if (c?.dataset.area) { libArea = c.dataset.area; $$('[data-area]', app).forEach((x) => x.classList.toggle('on', x === c)); draw(); return; }
-    if (c) { libFilter = c.dataset.f; $$('[data-f]', app).forEach((x) => x.classList.toggle('on', x === c)); draw(); }
-  };
+  app.onclick = (e) => { if (filterClick(e, libState)) draw(); };
   $('.search input', app).addEventListener('input', (e) => { libQuery = e.target.value; draw(); });
   draw();
   return () => figs.forEach((f) => f.stop());
@@ -945,6 +1109,11 @@ function viewSettings() {
   app.innerHTML = `
     <header class="top"><h1>Settings</h1></header>
     <section class="card settings">
+      <h3>Appearance</h3>
+      <div class="seg theme-seg" role="radiogroup" aria-label="Appearance">${[['auto', 'Auto', 'auto'], ['light', 'Light', 'sun'], ['dark', 'Dark', 'moon']].map(([k, l, ic]) => `<button role="radio" aria-checked="${S.theme === k}" data-theme-pick="${k}" class="${S.theme === k ? 'on' : ''}">${icon(ic, 'inline')} ${l}</button>`).join('')}</div>
+      <p class="muted small theme-note">Auto matches your phone. To switch at sunset, set iPhone Settings → Display &amp; Brightness → Automatic.</p>
+    </section>
+    <section class="card settings">
       <h3>Your coach</h3>
       <div class="coach-row">
         <div class="coach-preview"></div>
@@ -981,8 +1150,9 @@ function viewSettings() {
   settingsFig?.stop();
   settingsFig = renderFigure($('.coach-preview', app), BUILTIN.get('side-bend'), { aspect: 0.9 });
   app.onclick = (e) => {
-    const t = e.target.closest('[data-tog],[data-act],[data-coach],[data-skin],[data-units],[data-day]');
+    const t = e.target.closest('[data-tog],[data-act],[data-coach],[data-skin],[data-units],[data-day],[data-theme-pick]');
     if (!t) return;
+    if (t.dataset.themePick) { S.theme = t.dataset.themePick; applyTheme(S.theme); save(); viewSettings(); return; }
     if (t.dataset.day) {
       const d = +t.dataset.day, days = S.reminder.days;
       S.reminder = { ...S.reminder, days: days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort() };

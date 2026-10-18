@@ -4,6 +4,8 @@ A guided stretching, calisthenics, free-weights, and resistance-band web app for
 
 - **Use it:** open the site in Safari → Share → **Add to Home Screen**.
 - **Data:** stored on the device (localStorage). Use Settings → Export backup to move it.
+- **Explore:** 40 ready-made routines on the home screen (`js/routines.js`) with search, filters and sort; add any to My routines.
+- **Appearance:** Settings → Auto (follows the phone), Light, or Dark.
 - **Reminders:** Settings → Workout reminders adds a repeating event with an alert to the phone's calendar.
 - **Share a routine:** open a routine → ••• → Share routine. The link carries the whole routine.
 
