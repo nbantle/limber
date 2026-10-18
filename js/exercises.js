@@ -1,9 +1,10 @@
 // Built-in exercise library.
-// type: 'stretch' | 'strength' (shown as Calisthenics) | 'weights'. mode: 'time' | 'reps'. sided: done once per side.
+// type: 'stretch' | 'strength' (shown as Calisthenics) | 'weights' | 'bands'. mode: 'time' | 'reps'. sided: done once per side.
 // Animation poses are documented in figure.js.
 
 import { MORE, AREAS } from './exercises-more.js';
 import { WEIGHTS } from './exercises-weights.js';
+import { BANDS } from './exercises-bands.js';
 
 export { AREAS };
 
@@ -428,7 +429,7 @@ export const EXERCISES = [
   },
 ];
 
-EXERCISES.push(...MORE, ...WEIGHTS);
+EXERCISES.push(...MORE, ...WEIGHTS, ...BANDS);
 
 export const STARTER_ROUTINES = [
   {
@@ -499,6 +500,19 @@ export const STARTER_ROUTINES = [
       { ex: 'db-shoulder-press', reps: 10, sets: 2 },
       { ex: 'db-curl', reps: 12, sets: 2 },
       { ex: 'farmers-carry', duration: 40, sets: 2 },
+    ],
+  },
+  {
+    name: 'Resistance Band Basics',
+    rest: 30,
+    steps: [
+      { ex: 'band-squat', reps: 12, sets: 2 },
+      { ex: 'band-row', reps: 12, sets: 2 },
+      { ex: 'band-chest-press', reps: 12, sets: 2 },
+      { ex: 'band-deadlift', reps: 12, sets: 2 },
+      { ex: 'band-overhead-press', reps: 10, sets: 2 },
+      { ex: 'band-pull-apart', reps: 15, sets: 2 },
+      { ex: 'band-lateral-walk', duration: 30, sets: 2 },
     ],
   },
   {

@@ -18,6 +18,9 @@ import { paint } from './character2.js';
 //   axis (dumbbells/barbells): 'end' = handle points at the viewer (drawn as a plate), 'perp' = across the
 //   forearm, 'along' = in line with the forearm, 'level' = horizontal, 'upright' = vertical. hands 'both' = one item held in both hands.
 //   at: 'back' rests a barbell across the upper back instead of in the hands.
+//   Resistance bands: { kind: 'band', to: 'hands' | 'feet' | 'anchor' | 'knees', at, dx, dy, behind }.
+//   'hands' stretches between the grips, 'feet' runs from each grip down under that foot, 'anchor' runs to
+//   a fixed point (at + dx/dy, from the first frame), 'knees' is a loop around the thighs. behind: draw it behind the body.
 
 const LEN = { torso: 24, shoulderAt: 21, neck: 2.5, headR: 5, ua: 12.5, fa: 12, th: 18, sh: 18, foot: 6, footFront: 3.2 };
 export const GLUTE = { r: 4.2, off: 1.4 }; // side-view seat: circle tucked behind the hip, between torso and thighs
@@ -91,10 +94,46 @@ const unit = (v) => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v
 const grip = (J, s) => { const F = unit([J['hand' + s][0] - J['elbow' + s][0], J['hand' + s][1] - J['elbow' + s][1]]); return { p: [J['hand' + s][0] + F[0], J['hand' + s][1] + F[1]], F }; };
 const f2 = (n) => n.toFixed(2);
 
+export const BAND_COLORS = ['#e8c21c', '#e0473c', '#2fa55a', '#2f7fd8', '#2d3240']; // extra light → extra heavy
+
+function bandParts(J, gear, view, anchor, color) {
+  const out = { far: [], near: [], pts: [] };
+  const side = view === 'side';
+  const line = (list, a, b) => list.push({ tag: 'path', d: `M${f2(a[0])} ${f2(a[1])}L${f2(b[0])} ${f2(b[1])}`, stroke: color, 'stroke-width': 1.4, 'stroke-linecap': 'round', fill: 'none' });
+  const layer = (s) => (gear.behind || (side && s === 'L') ? out.far : out.near);
+  if (gear.to === 'hands') { line(gear.behind ? out.far : out.near, grip(J, 'L').p, grip(J, 'R').p); return out; }
+  if (gear.to === 'knees') {
+    const at = (s) => { const h = J['hip' + s], k = J['knee' + s]; return [h[0] + (k[0] - h[0]) * 0.8, h[1] + (k[1] - h[1]) * 0.8]; };
+    if (side) {
+      const a = at('R'), T = unit([J.kneeR[0] - J.hipR[0], J.kneeR[1] - J.hipR[1]]), N = [-T[1], T[0]];
+      line(out.near, [a[0] + N[0] * 2.9, a[1] + N[1] * 2.9], [a[0] - N[0] * 2.9, a[1] - N[1] * 2.9]);
+    } else {
+      const a = at('L'), b = at('R'), A = unit([b[0] - a[0], b[1] - a[1]]);
+      line(out.near, [a[0] - A[0] * 2.6, a[1] - A[1] * 2.6], [b[0] + A[0] * 2.6, b[1] + A[1] * 2.6]);
+    }
+    return out;
+  }
+  for (const s of ['L', 'R']) {
+    const g = grip(J, s).p;
+    let end;
+    if (gear.to === 'feet') {
+      const A = J['ankle' + s], T = J['toe' + s];
+      end = [(A[0] + T[0]) / 2, Math.max(A[1], T[1]) + 0.6];
+    } else end = anchor;
+    if (end) line(layer(s), g, end);
+  }
+  if (gear.to === 'anchor' && anchor) {
+    out.far.push({ tag: 'circle', cx: f2(anchor[0]), cy: f2(anchor[1]), r: 1.3, fill: GEAR.plate });
+    out.pts.push([anchor[0], anchor[1], 1.5]);
+  }
+  return out;
+}
+
 // Returns { far, near } paint ops and contact circles [x, y, r] for the equipment in this pose.
-function gearParts(J, gear, view) {
+function gearParts(J, gear, view, anchor, color = BAND_COLORS[2]) {
   const out = { far: [], near: [], pts: [] };
   if (!gear) return out;
+  if (gear.kind === 'band') return anchor === null ? out : bandParts(J, gear, view, anchor, color);
   const side = view === 'side';
   const circle = (list, c, r, fill) => { list.push({ tag: 'circle', cx: f2(c[0]), cy: f2(c[1]), r: f2(r), fill }); out.pts.push([c[0], c[1], r]); };
   const bar = (list, a, b, w, stroke) => list.push({ tag: 'path', d: `M${f2(a[0])} ${f2(a[1])}L${f2(b[0])} ${f2(b[1])}`, stroke, 'stroke-width': w, 'stroke-linecap': 'round', fill: 'none' });
@@ -250,7 +289,7 @@ export function makeRig(anim) {
     if (anim.hang || anim.top || (anim.steady && ref)) {
       if (ref) dy = ref.anchor[1] - J[anchor][1];
     } else {
-      const pts = [...contactPoints(J, plant), ...gearParts(J, anim.gear, view).pts];
+      const pts = [...contactPoints(J, plant), ...gearParts(J, anim.gear, view, null).pts];
       dy = -Math.max(...pts.map((p) => p[1] + p[2])) - (pose.lift ?? 0);
     }
     for (const k in J) if (Array.isArray(J[k])) J[k] = [J[k][0] + dx, J[k][1] + dy];
@@ -264,6 +303,8 @@ export function makeRig(anim) {
   };
 
   const J0 = place(frames[0], null);
+  const g = anim.gear;
+  const bandAnchor = g?.kind === 'band' && g.to === 'anchor' ? [J0[g.at ?? 'shoulderR'][0] + (g.dx ?? 0), J0[g.at ?? 'shoulderR'][1] + (g.dy ?? 0)] : undefined;
   const ref = { anchor: J0[anchor], joints: J0 };
   const at = (time) => place(poseAt(time), ref);
   const atFrame = (i) => place(frames[i % frames.length], ref);
@@ -287,7 +328,7 @@ export function makeRig(anim) {
     const J = at((i / N) * cycle);
     for (const s of segments(J, view)) { grow(...s.a, s.w / 2); grow(...s.b, s.w / 2); }
     grow(...J.head, LEN.headR);
-    for (const [x, y, r] of gearParts(J, anim.gear, view).pts) grow(x, y, r);
+    for (const [x, y, r] of gearParts(J, anim.gear, view, bandAnchor).pts) grow(x, y, r);
   }
   if (!anim.hang && !anim.top) grow(x0, 0);
   for (const pr of props) {
@@ -300,7 +341,7 @@ export function makeRig(anim) {
   const nearFloor = ['hip', 'kneeL', 'kneeR', 'handL', 'handR', 'neck'].some((k) => J0[k][1] > -7.5);
   const mat = anim.top || (anim.mat ?? (!anim.hang && nearFloor));
   const bbox = [x0, y0, x1, y1];
-  return { at, atFrame, view, cycle, bbox, props, mat, hang: !!anim.hang, top: !!anim.top };
+  return { at, atFrame, view, cycle, bbox, props, mat, bandAnchor, hang: !!anim.hang, top: !!anim.top };
 }
 
 function fitBox(bbox, aspect, pad = 7) {
@@ -414,7 +455,8 @@ function motionArrows(rig, anim, exercise) {
 }
 
 // Renders an exercise figure into `container`. Returns a controller.
-export function renderFigure(container, exercise, { animate = true, aspect = 1.3, frame = null, time = null, highlight = true, arrows: arrowsOn = true } = {}) {
+// band: resistance level (index into BAND_COLORS) for band exercises.
+export function renderFigure(container, exercise, { animate = true, aspect = 1.3, frame = null, time = null, highlight = true, arrows: arrowsOn = true, band = null } = {}) {
   const anim = exercise.anim;
   const rig = makeRig(anim);
   const arrows = arrowsOn ? motionArrows(rig, anim, exercise) : [];
@@ -444,7 +486,7 @@ export function renderFigure(container, exercise, { animate = true, aspect = 1.3
       shadow.setAttribute('cx', ((Math.min(...xs) + Math.max(...xs)) / 2).toFixed(2));
       shadow.setAttribute('rx', Math.max(6, (Math.max(...xs) - Math.min(...xs)) / 2 + 5).toFixed(2));
     }
-    const gear = gearParts(J, anim.gear, rig.view);
+    const gear = gearParts(J, anim.gear, rig.view, rig.bandAnchor, BAND_COLORS[band ?? exercise.band ?? 2]);
     const ops = [...gear.far, ...paint(J, rig.view, hl, anim.hotSegs, !rig.hang && !rig.top), ...gear.near];
     if (ops.length !== nodes.length || ops.some((o, i) => nodes[i].tagName !== o.tag)) {
       g.replaceChildren();

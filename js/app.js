@@ -1,5 +1,5 @@
 import { EXERCISES, STARTER_ROUTINES, MUSCLES, AREAS } from './exercises.js';
-import { renderFigure } from './figure.js';
+import { renderFigure, BAND_COLORS } from './figure.js';
 import { COACHES, SKINS, setLook } from './character2.js';
 import { muscleMapSVG } from './muscles.js';
 import { audio, wakeLock } from './audio.js';
@@ -7,7 +7,7 @@ import { audio, wakeLock } from './audio.js';
 // ───────────────────────── Storage ─────────────────────────
 
 const KEY = 'limber.v1';
-const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5, coach: 'a', skin: 1, units: 'lb' };
+const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5, coach: 'a', skin: 1, units: 'lb', reminder: { days: [], time: '07:00' } };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -58,6 +58,7 @@ const TYPES = {
   stretch: { label: 'Stretch', plural: 'Stretches', count: 'stretch', color: 'var(--stretch)' },
   strength: { label: 'Calisthenics', plural: 'Calisthenics', count: 'calisthenics', color: 'var(--strength)' },
   weights: { label: 'Free Weights', plural: 'Free Weights', count: 'free weight', color: 'var(--weights)' },
+  bands: { label: 'Bands', plural: 'Bands', count: 'band', color: 'var(--bands)' },
 };
 const typeVar = (t) => (TYPES[t] ?? TYPES.stretch).color;
 const typeLabel = (t) => (TYPES[t] ?? TYPES.stretch).label;
@@ -69,6 +70,38 @@ const weightInc = () => (db.settings.units === 'kg' ? 1 : 2.5);
 const roundWeight = (w) => Math.round(w * 2) / 2;
 const defaultWeight = (ex) => (ex.weight ? (db.settings.units === 'kg' ? Math.round(ex.weight / LB_PER_KG) : ex.weight) : 0);
 const fmtWeight = (w) => `${+(+w).toFixed(1)} ${db.settings.units}`;
+
+// Resistance band levels, matching BAND_COLORS in figure.js.
+const BAND_LEVELS = ['X-Light', 'Light', 'Medium', 'Heavy', 'X-Heavy'];
+const BAND_SPOKEN = ['extra light', 'light', 'medium', 'heavy', 'extra heavy'];
+const fmtBand = (b) => `${BAND_LEVELS[b]} band`;
+const bandDot = (b) => `<i class="band-dot" style="background:${BAND_COLORS[b]}"></i>`;
+
+// ───────────────────────── Lift log ─────────────────────────
+// Finished workouts store lifts: [{ ex, mode, u, b?, sets: [[load, reps or seconds]] }] — load is a weight
+// in units u, or a band level when b is set.
+
+function liftLog(exId) { // newest first
+  const out = [];
+  for (const h of db.history) for (const l of h.lifts ?? []) if (l.ex === exId) out.push({ date: h.date, ...l });
+  return out;
+}
+const toUnits = (w, u) => (!u || u === db.settings.units ? w : roundWeight(u === 'kg' ? w * LB_PER_KG : w / LB_PER_KG));
+// Heaviest set (most reps breaks ties), in current units.
+const topSet = (l) => l.sets.map(([w, n]) => [l.b ? w : toUnits(w, l.u), n]).reduce((a, s) => (s[0] > a[0] || (s[0] === a[0] && s[1] > a[1]) ? s : a));
+const fmtLoad = (l, w) => (l.b ? fmtBand(w) : fmtWeight(w));
+const liftText = (l) => { const [w, n] = topSet(l); return `${fmtLoad(l, w)} × ${n}${l.mode === 'time' ? 's' : ''}`; };
+const setsText = (l) => l.sets.map(([w, n]) => `${l.b ? BAND_LEVELS[w] : +toUnits(w, l.u).toFixed(1)}×${n}${l.mode === 'time' ? 's' : ''}`).join(', ');
+const shortDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+// Top-set trend, oldest → newest. Small line; the newest point gets a marker.
+function sparkline(vals, { w = 92, h = 30 } = {}) {
+  if (vals.length < 2) return '';
+  const min = Math.min(...vals), span = Math.max(...vals) - min || 1;
+  const xy = vals.map((v, i) => [3 + (i / (vals.length - 1)) * (w - 6), h - 4 - ((v - min) / span) * (h - 8)]);
+  const [lx, ly] = xy[xy.length - 1];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><path d="M${xy.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join('L')}"/><circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3"/></svg>`;
+}
 const muscleNames = (list) => (list ?? []).map((m) => MUSCLES[m] ?? m).join(', ');
 
 const ICONS = {
@@ -149,6 +182,7 @@ function stepInfo(step) {
     sets: step.sets ?? ex.sets ?? 1,
     setRest: step.setRest ?? (ex.type === 'weights' ? 60 : ex.type === 'strength' ? 30 : 10),
     weight: ex.type === 'weights' ? step.weight ?? defaultWeight(ex) : null,
+    band: ex.type === 'bands' ? step.band ?? ex.band ?? 2 : null,
     sided: !!ex.sided && step.sides !== 'one',
   };
 }
@@ -165,7 +199,7 @@ function buildPhases(routine) {
     for (let set = 1; set <= si.sets; set++) {
       sides.forEach((side, k) => {
         if (k > 0 && S.switchTime > 0) P.push({ kind: 'switch', dur: S.switchTime, side });
-        P.push({ kind: 'work', ex: si.ex, mode: si.mode, dur: si.mode === 'time' ? si.duration : null, reps: si.reps, weight: si.weight, side, set, sets: si.sets, step: idx });
+        P.push({ kind: 'work', ex: si.ex, mode: si.mode, dur: si.mode === 'time' ? si.duration : null, reps: si.reps, weight: si.weight, band: si.band, side, set, sets: si.sets, step: idx, sid: s.id });
       });
       if (set < si.sets && si.setRest > 0) P.push({ kind: 'rest', dur: si.setRest });
     }
@@ -185,6 +219,7 @@ function stepSummary(step) {
   let s = si.mode === 'time' ? fmtTime(si.duration) : `${si.reps} reps`;
   if (si.sets > 1) s += ` × ${si.sets} sets`;
   if (si.weight) s += ` · ${fmtWeight(si.weight)}`;
+  if (si.band !== null) s += ` · ${fmtBand(si.band)}`;
   if (si.sided) s += ' · each side';
   return s;
 }
@@ -250,7 +285,7 @@ function viewRoutines() {
         </div>
       </header>
       ${showHint && !sorting ? `<div class="hint"><div><strong>Install Limber</strong><p>Tap the Share button ${icon('share', 'inline')} then <b>Add to Home Screen</b> to use it like an app. Routines you make in the installed app stay there.</p></div><button class="btn-icon" data-act="hint" aria-label="Dismiss">${icon('close')}</button></div>` : ''}
-      ${sorting ? '<p class="muted small sort-tip">Drag the handles to reorder.</p>' : ''}
+      ${sorting ? '<p class="muted small sort-tip">Drag the handles to reorder.</p>' : workoutDayNudge()}
       <div class="cards ${sorting ? 'sorting-mode' : ''}">
         ${db.routines.length ? db.routines.map((r) => routineCard(r, sorting)).join('') : `<div class="empty"><p>No routines yet.</p><button class="btn primary" data-act="new">Create a routine</button></div>`}
       </div>
@@ -271,8 +306,17 @@ function viewRoutines() {
     }
     if (t.dataset.act === 'open') location.hash = `#/routine/${id}`;
     if (t.dataset.act === 'play') startRoutine(id);
+    if (t.dataset.act === 'nudge') { try { localStorage.setItem('limber.nudge', new Date().toDateString()); } catch { /* ignore */ } t.closest('.hint').remove(); }
     if (t.dataset.act === 'hint') { try { localStorage.setItem('limber.hint', '1'); } catch { /* ignore */ } t.closest('.hint').remove(); }
   };
+}
+
+// On a reminder day with no workout yet, a gentle banner on the home screen.
+function workoutDayNudge() {
+  const today = new Date().toDateString();
+  const dismissed = (() => { try { return localStorage.getItem('limber.nudge') === today; } catch { return false; } })();
+  if (dismissed || !db.settings.reminder.days.includes(new Date().getDay()) || db.history.some((h) => new Date(h.date).toDateString() === today) || !db.routines.length) return '';
+  return `<div class="hint nudge"><div><strong>It's a workout day</strong><p>Pick a routine below and press play.</p></div><button class="btn-icon" data-act="nudge" aria-label="Dismiss">${icon('close')}</button></div>`;
 }
 
 function routineCard(r, sorting = false) {
@@ -399,7 +443,7 @@ function viewEditor(id) {
       if (ex) figs.push(renderFigure(el, ex, { animate: false, aspect: 1.15 }));
     });
     const openFig = $('.step-preview', app);
-    if (openFig) figs.push(renderFigure(openFig, getEx(openFig.dataset.ex), { aspect: 1.25 }));
+    if (openFig) figs.push(renderFigure(openFig, getEx(openFig.dataset.ex), { aspect: 1.25, band: stepInfo(r.steps.find((x) => x.id === open))?.band }));
     sortable($('.steps', app), '.step', (from, to) => { move(r.steps, from, to); commit(); });
   };
 
@@ -417,6 +461,7 @@ function viewEditor(id) {
       case 'remove': r.steps.splice(idx, 1); if (open === sid) open = null; commit(); break;
       case 'mode': step.mode = t.dataset.v; commit(); break;
       case 'sides': step.sides = step.sides === 'one' ? undefined : 'one'; commit(); break;
+      case 'band': step.band = Math.min(4, Math.max(0, stepInfo(step).band + +t.dataset.inc)); commit(); break;
       case 'step': {
         const f = t.dataset.f, target = f === 'rest' && !sid ? r : step;
         const [min, max, inc] = [+t.dataset.min, +t.dataset.max, +t.dataset.inc];
@@ -498,10 +543,12 @@ function stepRow(s, i, n, isOpen, routineRest) {
           ? tile(`Duration${per}`, stepper('duration', si.duration, 5, 5, 600, 's'))
           : tile(`Reps${per}`, stepper('reps', si.reps, 1, 1, 200))}
         ${tile('Sets', stepper('sets', si.sets, 1, 1, 20))}
-        ${si.weight !== null ? tile('Weight', stepper('weight', si.weight, weightInc(), 0, db.settings.units === 'kg' ? 500 : 1000, db.settings.units)) : ''}
-        ${si.sets > 1 ? tile('Rest between sets', stepper('setRest', si.setRest, 5, 0, 300, 's')) : ''}
         ${tile('Rest after', stepper('rest', s.rest ?? '', 5, 0, 300, 's', routineRest))}
+        ${si.weight !== null ? tile('Weight', stepper('weight', si.weight, weightInc(), 0, db.settings.units === 'kg' ? 500 : 1000, db.settings.units)) : ''}
+        ${si.band !== null ? tile('Band', `<span class="stepper"><button data-act="band" data-inc="-1" aria-label="Lighter band" ${si.band ? '' : 'disabled'}>−</button><span class="band-val">${bandDot(si.band)}${BAND_LEVELS[si.band]}</span><button data-act="band" data-inc="1" aria-label="Heavier band" ${si.band < 4 ? '' : 'disabled'}>+</button></span>`) : ''}
+        ${si.sets > 1 ? tile('Set rest', stepper('setRest', si.setRest, 5, 0, 300, 's')) : ''}
       </div>
+      ${(() => { const last = si.weight !== null || si.band !== null ? liftLog(ex.id)[0] : null; return last ? `<p class="last-lift">Last time: <b>${liftText(last)}</b> · ${shortDate(last.date)}</p>` : ''; })()}
     </div>` : ''}
   </li>`;
 }
@@ -658,6 +705,7 @@ function viewExercise(id) {
           </div>
         </div>
       </section>
+      ${liftHistoryCard(ex)}
       <section class="card">
         <h3>How to do it</h3>
         <ol class="cues">${(ex.cues ?? []).map((c) => `<li>${esc(c)}</li>`).join('') || '<li>No instructions yet.</li>'}</ol>
@@ -666,6 +714,13 @@ function viewExercise(id) {
     </div>`;
   const fig = renderFigure($('.ex-hero', app), ex, { aspect: 1.5 });
   app.onclick = (e) => {
+    const pt = e.target.closest('[data-pt]');
+    if (pt) {
+      // Tap a point on the trend chart to read it.
+      $$('.lc-dot', app).forEach((d) => d.classList.toggle('on', d.dataset.i === pt.dataset.pt));
+      $('.lc-read', app).textContent = pt.dataset.label;
+      return;
+    }
     const t = e.target.closest('[data-act]');
     if (!t) return;
     if (t.dataset.act === 'back') { history.length > 1 ? history.back() : (location.hash = '#/library'); }
@@ -675,6 +730,46 @@ function viewExercise(id) {
     }
   };
   return () => fig.stop();
+}
+
+// "Your history" card on an exercise page: best / last / sessions, a trend chart, and the sessions as a list.
+function liftHistoryCard(ex) {
+  const log = liftLog(ex.id);
+  if (!log.length) {
+    return ex.type === 'weights' || ex.type === 'bands'
+      ? '<section class="card"><h3>Your history</h3><p class="muted small">Finish a workout with this exercise and your weights and reps will show up here.</p></section>' : '';
+  }
+  const isBand = !!log[0].b;
+  const tops = log.map(topSet);
+  const best = tops.reduce((a, s) => (s[0] > a[0] ? s : a));
+  const recent = log.slice(0, 12).reverse();
+  const vals = recent.map((l) => topSet(l)[0]);
+  // Trend chart: one series, so no legend; the title names it.
+  const W = 320, H = 120, padL = 34, padR = 10, padT = 12, padB = 22;
+  const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
+  const X = (i) => padL + (vals.length > 1 ? (i / (vals.length - 1)) * (W - padL - padR) : (W - padL - padR) / 2);
+  const Y = (v) => padT + (max === min ? 0.5 : 1 - (v - min) / span) * (H - padT - padB);
+  const yl = (v) => (isBand ? BAND_LEVELS[v] : +v.toFixed(1));
+  const label = (l) => `${shortDate(l.date)} · ${liftText(l)}`;
+  const chart = `<div class="lift-chart"><p class="lc-read muted small">${esc(label(recent[recent.length - 1]))}</p>
+    <svg viewBox="0 0 ${W} ${H}" class="lc" role="img" aria-label="Top set per workout">
+      <line class="lc-grid" x1="${padL}" x2="${W - padR}" y1="${Y(max)}" y2="${Y(max)}"/><line class="lc-grid" x1="${padL}" x2="${W - padR}" y1="${Y(min)}" y2="${Y(min)}"/>
+      <text class="lc-ax" x="${padL - 6}" y="${Y(max) + 4}" text-anchor="end">${yl(max)}</text>${max !== min ? `<text class="lc-ax" x="${padL - 6}" y="${Y(min) + 4}" text-anchor="end">${yl(min)}</text>` : ''}
+      <text class="lc-ax" x="${padL}" y="${H - 4}">${shortDate(recent[0].date)}</text><text class="lc-ax" x="${W - padR}" y="${H - 4}" text-anchor="end">${shortDate(recent[recent.length - 1].date)}</text>
+      ${vals.length > 1 ? `<path class="lc-line" d="M${vals.map((v, i) => `${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join('L')}"/>` : ''}
+      ${vals.map((v, i) => `<circle class="lc-dot ${i === vals.length - 1 ? 'on' : ''}" data-i="${i}" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4"/>`).join('')}
+      ${vals.map((v, i) => `<circle class="lc-hit" data-pt="${i}" data-label="${esc(label(recent[i]))}" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="14"/>`).join('')}
+    </svg></div>`;
+  return `<section class="card lift-card">
+    <h3>Your history</h3>
+    <div class="lift-stats">
+      <div><b>${fmtLoad(log[0], best[0])}</b><span>best</span></div>
+      <div><b>${liftText(log[0])}</b><span>last time</span></div>
+      <div><b>${log.length}</b><span>workout${log.length === 1 ? '' : 's'}</span></div>
+    </div>
+    ${chart}
+    <ul class="lift-list">${log.slice(0, 10).map((l) => `<li><span>${shortDate(l.date)}</span><span>${esc(setsText(l))}${isBand ? '' : ` ${db.settings.units}`}</span></li>`).join('')}</ul>
+  </section>`;
 }
 
 function viewCustomEditor(id) {
@@ -777,7 +872,67 @@ function viewHistory() {
       <div class="stat"><b>${weekMin}</b><span>min this week</span></div>
     </div>
     <div class="cal" aria-label="Last 4 weeks">${cells.map((d) => `<span class="${days.has(d.toDateString()) ? 'on' : ''} ${d.toDateString() === new Date().toDateString() ? 'today' : ''}" title="${d.toLocaleDateString()}"></span>`).join('')}</div>
-    <ul class="hist">${H.slice(0, 100).map((h) => `<li><div><b>${esc(h.name)}</b><span class="muted">${new Date(h.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${new Date(h.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span></div><span class="hist-time">${fmtTime(h.seconds)}${h.partial ? '<small>partial</small>' : ''}</span></li>`).join('') || '<li class="muted">Finish a routine and it will show up here.</li>'}</ul>`;
+    <div class="seg hist-tabs" role="tablist">${[['workouts', 'Workouts'], ['lifts', 'Lifts']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${histTab === k ? 'on' : ''}" aria-selected="${histTab === k}">${l}</button>`).join('')}</div>
+    ${histTab === 'lifts' ? liftsList() : `<ul class="hist">${H.slice(0, 100).map((h) => `<li><div><b>${esc(h.name)}</b><span class="muted">${new Date(h.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${new Date(h.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>${h.lifts?.length ? `<span class="hist-lifts">${esc(h.lifts.map((l) => `${getEx(l.ex)?.name ?? 'Exercise'} ${liftText(l)}`).join(' · '))}</span>` : ''}</div><span class="hist-time">${fmtTime(h.seconds)}${h.partial ? '<small>partial</small>' : ''}</span></li>`).join('') || '<li class="muted">Finish a routine and it will show up here.</li>'}</ul>`}`;
+  app.onclick = (e) => {
+    const t = e.target.closest('[data-tab]');
+    if (t) { histTab = t.dataset.tab; viewHistory(); }
+  };
+}
+
+let histTab = 'workouts';
+
+// Every exercise you've logged a load for: last top set, trend, best. Most recently done first.
+function liftsList() {
+  const ids = [...new Set(db.history.flatMap((h) => (h.lifts ?? []).map((l) => l.ex)))].filter(getEx);
+  if (!ids.length) return '<p class="muted pad center">Finish a workout with free weights or bands and your lifts will show up here.</p>';
+  return `<ul class="lifts">${ids.map((id) => {
+    const log = liftLog(id), ex = getEx(id);
+    const best = log.map(topSet).reduce((a, s) => (s[0] > a[0] ? s : a));
+    return `<li><a href="#/exercise/${id}" style="--acc:${typeVar(ex.type)}">
+      <span class="lift-main"><b>${esc(ex.name)}</b><span class="muted">${liftText(log[0])} · ${shortDate(log[0].date)}</span></span>
+      ${sparkline(log.slice(0, 10).reverse().map((l) => topSet(l)[0]))}
+      <span class="lift-best"><b>${fmtLoad(log[0], best[0])}</b><small>best</small></span>
+    </a></li>`;
+  }).join('')}</ul>`;
+}
+
+// ───────────────────────── Reminders ─────────────────────────
+// A static web app can't schedule notifications on iPhone, so reminders go into the phone's calendar
+// as a weekly repeating event with an alert, which works even when Limber is closed.
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const ICS_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+function reminderIcs({ days, time }) {
+  const [hh, mm] = time.split(':').map(Number);
+  const pad = (n) => String(n).padStart(2, '0');
+  const d = new Date();
+  d.setHours(hh, mm, 0, 0);
+  while (!days.includes(d.getDay()) || d < new Date()) d.setDate(d.getDate() + 1); // first upcoming workout day
+  const local = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(hh)}${pad(mm)}00`;
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const url = `${location.origin}${location.pathname}`;
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Limber//Workout reminder//EN', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT', `UID:limber-${Date.now()}@limber`, `DTSTAMP:${stamp}`, `DTSTART:${local}`, 'DURATION:PT20M',
+    `RRULE:FREQ=WEEKLY;BYDAY=${days.map((i) => ICS_DAYS[i]).join(',')}`,
+    'SUMMARY:Limber workout', `DESCRIPTION:Time to move! Open Limber: ${url}`, `URL:${url}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Time for your Limber workout', 'TRIGGER:PT0M', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+}
+
+function addReminderToCalendar(reminder) {
+  if (!reminder.days.length) return;
+  const ics = reminderIcs(reminder);
+  // iPhone/iPad open a calendar file straight into the "Add to Calendar" screen; elsewhere download it.
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios) { location.href = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`; return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+  a.download = 'limber-workout-reminder.ics';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast('Open the downloaded file to add it to your calendar');
 }
 
 // ───────────────────────── Settings ─────────────────────────
@@ -809,18 +964,32 @@ function viewSettings() {
       <button class="btn ghost wide" data-act="test">Test sound</button>
     </section>
     <section class="card settings">
+      <h3>Workout reminders</h3>
+      <p class="muted small">Pick your workout days and a time. Limber adds a repeating event with an alert to your phone's calendar, so you get reminded even when the app is closed.</p>
+      <div class="days" role="group" aria-label="Workout days">${DAY_NAMES.map((d, i) => `<button class="day ${S.reminder.days.includes(i) ? 'on' : ''}" data-day="${i}" aria-pressed="${S.reminder.days.includes(i)}" aria-label="${d}">${d[0]}</button>`).join('')}</div>
+      <label class="switch-row"><span>Time</span><input class="time-input" type="time" value="${S.reminder.time}" data-rem="time"></label>
+      <button class="btn primary wide" data-act="calendar" ${S.reminder.days.length ? '' : 'disabled'}>${icon('clock')} Add to Calendar</button>
+    </section>
+    <section class="card settings">
       <h3>Your data</h3>
       <p class="muted">Routines and history are saved on this phone. Make a backup before switching phones.</p>
       <button class="btn ghost wide" data-act="export">Export backup</button>
       <label class="btn ghost wide file-btn">Import backup<input type="file" accept="application/json,.json" hidden></label>
       <button class="btn ghost wide" data-act="starters">Add starter routines</button>
     </section>
-    <p class="muted center small">Limber · stretching, calisthenics &amp; free weights<br>Listen to your body — stop if anything hurts.</p>`;
+    <p class="muted center small">Limber · stretching, calisthenics, weights &amp; bands<br>Listen to your body — stop if anything hurts.</p>`;
   settingsFig?.stop();
   settingsFig = renderFigure($('.coach-preview', app), BUILTIN.get('side-bend'), { aspect: 0.9 });
   app.onclick = (e) => {
-    const t = e.target.closest('[data-tog],[data-act],[data-coach],[data-skin],[data-units]');
+    const t = e.target.closest('[data-tog],[data-act],[data-coach],[data-skin],[data-units],[data-day]');
     if (!t) return;
+    if (t.dataset.day) {
+      const d = +t.dataset.day, days = S.reminder.days;
+      S.reminder = { ...S.reminder, days: days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort() };
+      save(); viewSettings();
+      return;
+    }
+    if (t.dataset.act === 'calendar') { addReminderToCalendar(S.reminder); return; }
     if (t.dataset.units && t.dataset.units !== S.units) {
       // Convert weights already set on routine steps so they mean the same load.
       const f = t.dataset.units === 'kg' ? 1 / LB_PER_KG : LB_PER_KG;
@@ -854,6 +1023,7 @@ function viewSettings() {
   app.onchange = async (e) => {
     const t = e.target;
     if (t.dataset.num) { S[t.dataset.num] = Math.min(+t.max, Math.max(+t.min, Math.round(+t.value) || 0)); save(); viewSettings(); }
+    if (t.dataset.rem === 'time' && t.value) { S.reminder = { ...S.reminder, time: t.value }; save(); }
     if (t.type === 'file' && t.files[0]) {
       try {
         const data = JSON.parse(await t.files[0].text());
@@ -882,7 +1052,7 @@ function viewPlayer(id) {
 
   let idx = 0, acc = 0, runningSince = null, extra = 0, lastWhole = null, done = false;
   let sessionAcc = 0, sessionSince = null;
-  let fig = null, figEx = null, cueTimer = null, cueI = 0, showMap = false, pendingIntro = !audio.unlocked;
+  let fig = null, figEx = null, figBand = null, cueTimer = null, cueI = 0, showMap = false, pendingIntro = !audio.unlocked;
 
   app.innerHTML = `
     <div class="player">
@@ -903,12 +1073,12 @@ function viewPlayer(id) {
       </div>
       <button class="pl-cue" data-act="cues"></button>
       <div class="pl-timer-row">
-        <span></span>
+        <button class="pl-less" data-act="less" aria-label="Take 15 seconds off">−15s</button>
         <div class="pl-timer">
           <svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="54" class="ring-bg"/><circle cx="60" cy="60" r="54" class="ring-fg" stroke-dasharray="${RING_C}" stroke-dashoffset="0"/></svg>
           <div class="pl-time"><b></b><small></small></div>
         </div>
-        <button class="pl-extra" data-act="extra" aria-label="Add 10 seconds">+10s</button>
+        <button class="pl-extra" data-act="extra" aria-label="Add time">+10s</button>
       </div>
       <div class="pl-controls">
         <button class="btn-icon lg" data-act="prev" aria-label="Previous">${icon('prev')}</button>
@@ -922,7 +1092,7 @@ function viewPlayer(id) {
     kicker: $('.pl-kicker', app), name: $('.pl-name', app), chips: $('.pl-chips', app),
     fig: $('.pl-fig', app), map: $('.pl-map', app), mini: $('.pl-mini', app), cue: $('.pl-cue', app),
     ring: $('.ring-fg', app), timeB: $('.pl-time b', app), timeS: $('.pl-time small', app),
-    main: $('.pl-main', app), extra: $('.pl-extra', app), timer: $('.pl-timer', app),
+    main: $('.pl-main', app), extra: $('.pl-extra', app), less: $('.pl-less', app), timer: $('.pl-timer', app),
   };
 
   const now = () => Date.now();
@@ -937,14 +1107,15 @@ function viewPlayer(id) {
   function describe(p) {
     const side = p.side ? `, ${p.side.toLowerCase()} side` : '';
     const amount = p.mode === 'time' ? `${p.dur} seconds` : `${p.reps} reps`;
-    const load = p.weight ? ` ${+p.weight.toFixed(1)} ${S.units === 'kg' ? 'kilos' : 'pounds'}.` : '';
+    const load = p.weight ? ` ${+p.weight.toFixed(1)} ${S.units === 'kg' ? 'kilos' : 'pounds'}.` : p.band !== null && p.band !== undefined ? ` ${BAND_SPOKEN[p.band]} band.` : '';
     return `${p.ex.name}${side}. ${amount}.${load}`;
   }
 
-  function setFigure(ex, dim) {
-    if (figEx !== ex) {
+  function setFigure(ex, dim, band = null) {
+    if (figEx !== ex || figBand !== band) {
       fig?.stop();
-      fig = renderFigure(el.fig, ex, { aspect: 1.25 });
+      fig = renderFigure(el.fig, ex, { aspect: 1.25, band });
+      figBand = band;
       el.map.innerHTML = muscleMapSVG(ex.primary, ex.secondary);
       el.mini.innerHTML = muscleMapSVG(ex.primary, ex.secondary, { labels: false });
       figEx = ex;
@@ -985,33 +1156,95 @@ function viewPlayer(id) {
     if (p.kind === 'work') {
       el.kicker.textContent = typeLabel(p.ex.type);
       el.name.textContent = p.ex.name;
-      el.chips.innerHTML = [p.side && `<span class="chip on">${p.side} side</span>`, p.sets > 1 && `<span class="chip">Set ${p.set} of ${p.sets}</span>`, p.weight && `<span class="chip">${fmtWeight(p.weight)}</span>`].filter(Boolean).join('');
-      setFigure(p.ex, false);
+      workChips(p);
+      setFigure(p.ex, false, p.band);
       rotateCues(p.ex);
       if (!silent) { beep(1046, 0.22); say(describe(p)); }
     } else {
       const n = p.next;
       el.kicker.textContent = p.kind === 'prep' ? 'Get ready' : p.kind === 'switch' ? 'Switch sides' : 'Rest';
       el.name.textContent = p.kind === 'switch' ? `${p.side} side next` : n ? `Next: ${n.ex.name}` : 'Almost done';
-      el.chips.innerHTML = n ? `<span class="chip">${n.mode === 'time' ? fmtTime(n.dur) : `${n.reps} reps`}${n.weight ? ` · ${fmtWeight(n.weight)}` : ''}${n.side ? ` · ${n.side}` : ''}</span>` : '';
-      if (n) { setFigure(n.ex, true); rotateCues(n.ex); }
+      el.chips.innerHTML = (n ? `<span class="chip">${n.mode === 'time' ? fmtTime(n.dur) : `${n.reps} reps`}${n.weight ? ` · ${fmtWeight(n.weight)}` : ''}${n.band !== null ? ` · ${fmtBand(n.band)}` : ''}${n.side ? ` · ${n.side}` : ''}</span>` : '')
+        + `<button class="chip skip" data-act="next">${p.kind === 'rest' ? 'Skip rest' : 'Skip'} ›</button>`;
+      if (n) { setFigure(n.ex, true, n.band); rotateCues(n.ex); }
       if (!silent) {
         if (p.kind === 'prep') say(`Get ready. First up: ${n ? describe(n) : ''}`);
         else if (p.kind === 'switch') say(`Switch to the ${p.side.toLowerCase()} side.`);
         else say(n ? `Rest. Next up: ${n.ex.name}${n.side ? `, ${n.side.toLowerCase()} side` : ''}.` : 'Rest.');
       }
     }
+    // Timed work can be extended by 10s; rests, prep and side switches get −15s / +15s.
+    const resting = p.kind !== 'work';
     el.extra.hidden = !p.dur;
+    el.extra.textContent = resting ? '+15s' : '+10s';
+    el.less.hidden = !resting;
     tick();
   }
 
-  function next(opts) { enter(idx + 1, opts); }
+  // Chips for a work phase: side, set, the load (tap to change it) and what you lifted last time.
+  function workChips(p) {
+    const last = p.weight !== null || p.band !== null ? liftLog(p.ex.id)[0] : null;
+    el.chips.innerHTML = [
+      p.side && `<span class="chip on">${p.side} side</span>`,
+      p.sets > 1 && `<span class="chip">Set ${p.set} of ${p.sets}</span>`,
+      p.weight !== null && `<button class="chip load" data-act="load">${fmtWeight(p.weight)} ${icon('edit', 'inline')}</button>`,
+      p.band !== null && `<button class="chip load" data-act="load">${bandDot(p.band)}${fmtBand(p.band)} ${icon('edit', 'inline')}</button>`,
+      last && `<span class="chip ghost">Last: ${liftText(last)}</span>`,
+    ].filter(Boolean).join('');
+  }
+
+  // Completed work phases, for the lift log. Skipping counts once at least half the set is done.
+  function next(opts = {}) {
+    const p = phase();
+    if (p?.kind === 'work' && !p.logged && (opts.done || elapsed() >= (p.dur ? p.dur * 500 : 4000))) p.logged = true;
+    enter(idx + 1, opts);
+  }
+
+  function lifts() {
+    const out = [];
+    phases.forEach((p) => {
+      if (!p.logged || (p.weight === null && p.band === null)) return;
+      let l = out.find((x) => x.step === p.step);
+      if (!l) out.push(l = { step: p.step, ex: p.ex.id, mode: p.mode, u: S.units, ...(p.band !== null ? { b: true } : {}), sets: [] });
+      l.sets.push([p.band ?? p.weight, p.mode === 'time' ? p.dur : p.reps]);
+    });
+    return out.map(({ step, ...l }) => l);
+  }
+
+  // Change the load for this exercise mid-workout; it sticks to the routine for next time.
+  function editLoad(p) {
+    const step = r.steps.find((st) => st.id === p.sid);
+    if (!step) return;
+    const wasPaused = paused();
+    pause();
+    const isBand = p.band !== null;
+    const body = () => (isBand
+      ? `<div class="load-pick">${BAND_LEVELS.map((l, i) => `<button class="chip ${i === p.band ? 'on' : ''}" data-band="${i}">${bandDot(i)}${l}</button>`).join('')}</div>`
+      : `<div class="load-row">${stepper('weight', p.weight, weightInc(), 0, S.units === 'kg' ? 500 : 1000, S.units)}</div>`);
+    const s = sheet(`<div class="sheet-head"><h3>${esc(p.ex.name)}</h3><button class="btn small primary" data-act="ok">Done</button></div><p class="muted small">Changes this exercise in “${esc(r.name)}” too.</p><div class="load-body">${body()}</div>`,
+      { onClose: () => { save(); workChips(phase()); if (!wasPaused) resume(); } });
+    const set = (v) => {
+      phases.forEach((q) => { if (q.sid === p.sid) q[isBand ? 'band' : 'weight'] = v; });
+      step[isBand ? 'band' : 'weight'] = v;
+      $('.load-body', s.el).innerHTML = body();
+      if (isBand) setFigure(p.ex, false, v);
+    };
+    s.el.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.act === 'ok') s.close();
+      else if (b.dataset.band) set(+b.dataset.band);
+      else if (b.dataset.act === 'step') set(roundWeight(Math.min(+b.dataset.max, Math.max(+b.dataset.min, p.weight + +b.dataset.inc))));
+    });
+    s.el.addEventListener('change', (e) => { if (e.target.dataset.num === 'weight') set(roundWeight(Math.max(0, +e.target.value || 0))); });
+  }
 
   function finish() {
     done = true;
     stopTimers();
     const secs = Math.round(sessionElapsed() / 1000);
-    db.history.unshift({ id: uid(), routineId: r.id, name: r.name, date: new Date().toISOString(), seconds: secs });
+    const lf = lifts();
+    db.history.unshift({ id: uid(), routineId: r.id, name: r.name, date: new Date().toISOString(), seconds: secs, ...(lf.length ? { lifts: lf } : {}) });
     db.history = db.history.slice(0, 1000);
     save();
     say('Workout complete. Great job!');
@@ -1043,7 +1276,7 @@ function viewPlayer(id) {
       if (remain <= 0) {
         // Catch up if the phone slept through one or more phases.
         const late = -remain;
-        next({ silent: late > 1500, carry: late > 1500 ? late : 0 });
+        next({ silent: late > 1500, carry: late > 1500 ? late : 0, done: true });
         return;
       }
       const whole = Math.ceil(remain / 1000);
@@ -1101,7 +1334,7 @@ function viewPlayer(id) {
       case 'main':
         if (!audio.unlocked) audio.unlock();
         if (paused()) resume();
-        else if (p.kind === 'work' && p.mode === 'reps') next();
+        else if (p.kind === 'work' && p.mode === 'reps') next({ done: true });
         else pause();
         break;
       case 'next': next(); break;
@@ -1109,7 +1342,12 @@ function viewPlayer(id) {
         if (elapsed() > 3000 || idx === 0) enter(idx);
         else { let j = idx - 1; while (j > 0 && phases[j].kind !== 'work' && phases[j].kind !== 'prep') j--; enter(j); }
         break;
-      case 'extra': extra += 10000; lastWhole = null; tick(); break;
+      case 'extra': extra += p.kind === 'work' ? 10000 : 15000; lastWhole = null; tick(); break;
+      case 'less':
+        if (p.dur * 1000 + extra - 15000 - elapsed() < 1000) next();
+        else { extra -= 15000; lastWhole = null; tick(); }
+        break;
+      case 'load': editLoad(p); break;
       case 'map': showMap = !showMap; el.map.hidden = !showMap; el.fig.hidden = showMap; el.mini.hidden = showMap; t.classList.toggle('on', showMap); break;
       case 'cues': {
         const ex = p.kind === 'work' ? p.ex : p.next?.ex;
@@ -1125,7 +1363,8 @@ function viewPlayer(id) {
         if (sessionElapsed() < 15000 || confirm('End this workout?')) {
           const workDone = phases.slice(0, idx).filter((q) => q.kind === 'work').length;
           if (workDone > 0) {
-            db.history.unshift({ id: uid(), routineId: r.id, name: r.name, date: new Date().toISOString(), seconds: Math.round(sessionElapsed() / 1000), partial: true });
+            const lf = lifts();
+            db.history.unshift({ id: uid(), routineId: r.id, name: r.name, date: new Date().toISOString(), seconds: Math.round(sessionElapsed() / 1000), partial: true, ...(lf.length ? { lifts: lf } : {}) });
             save();
           }
           location.hash = `#/routine/${r.id}`;
