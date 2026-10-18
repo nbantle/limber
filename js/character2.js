@@ -400,7 +400,7 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
         const T = [p0, p1, p2, p3, p4].map((p, i) => (floor ? [p[0], Math.min(p[1], -rads[i] * R - 0.15)] : p));
         const fr = { at: (u) => { const i = Math.min(3, Math.floor(u * 4)); const k = u * 4 - i; return [T[i][0] + (T[i + 1][0] - T[i][0]) * k, T[i][1] + (T[i + 1][1] - T[i][1]) * k]; }, tan: (u) => { const i = Math.min(3, Math.floor(u * 4)); return norm([T[i + 1][0] - T[i][0], T[i + 1][1] - T[i][1]]); } };
         push(part(fr, rads.map((r, i) => [i / 4, r * R, r * R]), 0, 1), who.hair);
-        { const a = Q(-0.5, 0.97), b = Q(-0.9, 0.36), m = Q(-0.79, 0.73); tie = [a, add(m, [-F[0], -F[1]], 0.06 * R), b]; } // along the back of the skull, where the ponytail starts
+        { const a = Q(-0.6, 0.96), b = Q(-0.99, 0.37), m = Q(-0.88, 0.72); tie = [a, add(m, [-F[0], -F[1]], 0.06 * R), b]; } // along the back of the skull, where the ponytail starts
         if (real) {
           // Strands down the tail: one lighter sheen, one darker groove.
           for (const [off, col, w] of [[0.12, hairHi, 0.05], [-0.14, hairLo, 0.045]]) {
