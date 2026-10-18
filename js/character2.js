@@ -23,15 +23,17 @@ function hull(pts) {
   return [...lo.slice(0, -1), ...up.slice(0, -1)];
 }
 
-function smooth(pts, open = false) {
+// corners: indices drawn as sharp corners (no overshoot), e.g. the open hem of a sleeve.
+function smooth(pts, open = false, corners = null) {
   const n = pts.length;
   const P = (i) => (open ? pts[Math.max(0, Math.min(n - 1, i))] : pts[(i + n) % n]);
   let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
   const last = open ? n - 1 : n;
   for (let i = 0; i < last; i++) {
     const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
-    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
-    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    const i2 = (i + 1) % n;
+    const c1 = corners?.has(i) ? p1 : [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = corners?.has(i2) ? p2 : [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
     d += `C${f(c1[0])} ${f(c1[1])} ${f(c2[0])} ${f(c2[1])} ${f(p2[0])} ${f(p2[1])}`;
   }
   return open ? d : d + 'Z';
@@ -88,7 +90,11 @@ function part(fr, prof, u0, u1, { capA = true, capB = true, grow = 0, keep = nul
     return out;
   };
   const pts = [...L, ...(capB ? cap(geo[n - 1], false) : []), ...R.reverse(), ...(capA ? cap(geo[0], true) : [])];
-  return smooth(pts);
+  // Open ends (hems, waistbands) are cut straight across with crisp corners instead of curving past them.
+  const corners = new Set();
+  if (!capB) corners.add(n - 1).add(n);
+  if (!capA) corners.add(pts.length - 1).add(0);
+  return smooth(pts, false, corners);
 }
 
 // Center (or offset) line along a part, for dashed muscle cues.
@@ -234,11 +240,11 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       const legCol = who.mono ? skin : fem ? who.bottom : skin;
       const thigh = () => {
         push(part(f1, p1, 0, 1, { scale: sc }), far(legCol, isFar));
-        if (!who.mono && !fem) push(part(f1, p1, -0.05, 0.55, { grow: 0.55, capB: false, scale: sc }), far(who.bottom, isFar));
+        if (!who.mono && !fem) push(part(f1, p1, -0.05, 0.55, { grow: 0.35, capB: false, scale: sc }), far(who.bottom, isFar));
       };
       const shin = () => {
         push(part(f2, p2, 0, 1, { scale: sc }), far(legCol, isFar));
-        if (!who.mono && !fem) push(part(f2, p2, 0.8, 0.95, { grow: 0.12, capA: false, capB: false, scale: sc }), far(C.white, isFar));
+        if (!who.mono && !fem) push(part(f2, p2, 0.8, 1.0, { grow: 0.12, capA: false, capB: false, scale: sc }), far(C.white, isFar));
       };
       // Cross-legged front poses: the shins cross in front of the thighs.
       if (J.legsFront === 'cross' && !side) { thigh(); shin(); } else { shin(); thigh(); }
@@ -273,10 +279,13 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       // Compact shoe under the ankle, oriented along the shin.
       const K = J['knee' + s];
       const D = norm([A[0] - K[0], A[1] - K[1]]), X = [-D[1], D[0]];
-      const C = add(A, D, 0.6 * sc);
-      const at = ([x, y]) => [C[0] + (X[0] * x + D[0] * y) * sc, C[1] + (X[1] * x + D[1] * y) * sc];
-      push(smooth([[-1.9, -1.2], [1.9, -1.2], [2.3, 0.6], [1.6, 1.9], [-1.6, 1.9], [-2.3, 0.6]].map(at)), far(who.shoe, isFar));
-      push(smooth([[-2.3, 1.1], [2.3, 1.1], [1.8, 2.15], [-1.8, 2.15]].map(at)), far(C.mist, isFar));
+      const O = add(A, D, 0.4 * sc);
+      const at = ([x, y]) => [O[0] + (X[0] * x + D[0] * y) * sc, O[1] + (X[1] * x + D[1] * y) * sc];
+      // Sneaker seen from the front: ankle collar, toe box widening toward the floor, light sole, laces.
+      push(smooth([[-1.3, -1.1], [1.3, -1.1], [1.8, 0.2], [2.15, 1.3], [2.0, 1.95], [-2.0, 1.95], [-2.15, 1.3], [-1.8, 0.2]].map(at), false, new Set([4, 5])), far(who.shoe, isFar));
+      push(smooth([[-2.2, 1.6], [2.2, 1.6], [2.1, 2.3], [-2.1, 2.3]].map(at), false, new Set([0, 1])), far(mix(C.mist, C.slate, 0.25), isFar));
+      push(smooth([[-0.75, -1.1], [0.75, -1.1], [0.6, 0.9], [-0.6, 0.9]].map(at)), far(mix(who.shoe, C.white, 0.45), isFar)); // tongue
+      for (const y of [-0.45, 0.1, 0.6]) ops.push({ tag: 'path', d: `M${f(at([-0.8, y])[0])} ${f(at([-0.8, y])[1])}L${f(at([0.8, y])[0])} ${f(at([0.8, y])[1])}`, stroke: far(C.white, isFar), 'stroke-width': 0.32 * sc, 'stroke-linecap': 'round', fill: 'none' });
       return;
     }
     if (G[1] < 0) G = [-G[0], -G[1]]; // sole faces down
