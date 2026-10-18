@@ -6,6 +6,7 @@ import { COACHES, SKINS, setLook } from './character2.js';
 import { muscleMapSVG } from './muscles.js';
 import { audio, wakeLock } from './audio.js';
 import * as stats from './analytics.js';
+import { RELEASES } from './whatsnew.js';
 
 // ───────────────────────── Storage ─────────────────────────
 
@@ -17,6 +18,8 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const seedRoutines = () => STARTER_ROUTINES.map((r) => ({ ...clone(r), id: uid(), steps: r.steps.map((s) => ({ ...s, id: uid() })) }));
 
 let db;
+// Someone who already had Limber before this load (so they get "what's new" notes; brand-new people don't).
+const returning = (() => { try { return localStorage.getItem(KEY) !== null; } catch { return false; } })();
 function load() {
   try { db = JSON.parse(localStorage.getItem(KEY)); } catch { db = null; }
   if (!db || typeof db !== 'object') {
@@ -246,6 +249,29 @@ function fitChips(box) {
 }
 new MutationObserver(() => $$('.fill:not([data-fit])').forEach((b) => { b.dataset.fit = '1'; fitChips(b); }))
   .observe(document.body, { childList: true, subtree: true });
+
+// ───────────────────────── What's new ─────────────────────────
+
+const SEEN_KEY = 'limber.seenRelease';
+const seenRelease = () => { try { return +localStorage.getItem(SEEN_KEY) || 0; } catch { return 0; } };
+const markSeen = () => { try { localStorage.setItem(SEEN_KEY, RELEASES[0].id); } catch { /* ignore */ } };
+
+// Shows the notes newer than `since` (all of them when opened from Settings).
+function openWhatsNew(since = 0) {
+  const list = RELEASES.filter((r) => r.id > since);
+  const s = sheet(`
+    <div class="sheet-head"><h3>What’s new</h3><span class="muted small">${esc(list[0].date)}</span></div>
+    <div class="wn">${list.flatMap((r) => r.items).map(([ic, title, text]) => `<div class="wn-item"><span class="wn-ic">${icon(ic)}</span><div><b>${esc(title)}</b><p>${esc(text)}</p></div></div>`).join('')}</div>
+    <button class="btn primary wide big" data-act="ok">Got it</button>`, { onClose: markSeen });
+  s.el.onclick = (e) => { if (e.target.closest('[data-act=ok]')) s.close(); };
+}
+
+// On launch: returning people see notes they haven't seen yet; new people start caught up.
+function checkWhatsNew() {
+  if (!returning) { markSeen(); return; }
+  const since = seenRelease();
+  if (since < RELEASES[0].id && !location.hash.startsWith('#/play') && !location.hash.startsWith('#/import')) setTimeout(() => openWhatsNew(since), 400);
+}
 
 // ───────────────────────── Feedback ─────────────────────────
 
@@ -1425,6 +1451,7 @@ function viewSettings() {
       <h3>Feedback</h3>
       <p class="muted small">Found a problem or have an idea? Tell me. I read every one.</p>
       <button class="btn primary wide" data-act="feedback">${icon('flag', 'inline')} Send feedback</button>
+      <button class="btn ghost wide" data-act="whatsnew">${icon('spark', 'inline')} What’s new</button>
     </section>
     <section class="card settings">
       <h3>Appearance</h3>
@@ -1499,6 +1526,7 @@ function viewSettings() {
       save(); viewSettings();
     }
     if (t.dataset.act === 'feedback') { openFeedback(); return; }
+    if (t.dataset.act === 'whatsnew') { openWhatsNew(); return; }
     if (t.dataset.act === 'test') { audio.unlock(); audio.beep(660); setTimeout(() => audio.beep(990, 0.25), 300); if (S.voice) setTimeout(() => audio.speak('Voice guidance is on.'), 700); }
     if (t.dataset.act === 'export') {
       const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
@@ -1876,7 +1904,8 @@ function viewPlayer(id) {
 // ───────────────────────── Boot ─────────────────────────
 
 render();
-try { if (sessionStorage.getItem('limber.updated')) { sessionStorage.removeItem('limber.updated'); toast('Updated to the latest version'); } } catch { /* ignore */ }
+try { if (sessionStorage.getItem('limber.updated')) { sessionStorage.removeItem('limber.updated'); if (seenRelease() >= RELEASES[0].id || !returning) toast('Updated to the latest version'); } } catch { /* ignore */ }
+checkWhatsNew();
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   // The installed app resumes from memory instead of reloading, so check for a new version whenever it

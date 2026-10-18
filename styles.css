@@ -626,3 +626,11 @@ body:has(.chat-input) #toast { bottom: calc(var(--safe-bottom) + 132px); }
 .fb textarea { resize: vertical; min-height: 110px; }
 .fb label .muted { font-weight: 400; }
 @media (max-width: 380px) { .fbar:has(.sort) > .chip { padding: 6px 9px; } .fbar:has(.sort) { gap: 5px; } }
+
+/* ── What's new ── */
+.wn { display: grid; gap: 14px; margin: 4px 0 18px; }
+.wn-item { display: flex; gap: 12px; align-items: flex-start; }
+.wn-ic { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: color-mix(in srgb, var(--go) 18%, var(--surface)); color: color-mix(in srgb, var(--go) 70%, var(--text)); }
+.wn-ic .ic { width: 20px; height: 20px; }
+.wn-item b { font-size: 15.5px; }
+.wn-item p { margin: 2px 0 0; font-size: 14px; line-height: 1.4; color: var(--text-2); }
