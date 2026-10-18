@@ -39,7 +39,7 @@ function applyTheme(theme) {
   if (theme === 'light' || theme === 'dark') root.dataset.theme = theme; else delete root.dataset.theme;
   try { localStorage.setItem('limber.theme', theme); } catch { /* ignore */ }
   document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
-    m.content = theme === 'dark' ? '#0e1014' : theme === 'light' ? '#f5f6f8' : (m.media.includes('dark') ? '#0e1014' : '#f5f6f8');
+    m.content = theme === 'dark' ? '#1f242c' : theme === 'light' ? '#eef1f5' : (m.media.includes('dark') ? '#1f242c' : '#eef1f5');
   });
 }
 

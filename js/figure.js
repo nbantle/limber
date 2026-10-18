@@ -1,4 +1,5 @@
 import { paint } from './character2.js';
+import { C, mix } from './palette.js';
 
 // Animated figure renderer.
 //
@@ -89,12 +90,12 @@ function segments(J, view) {
 }
 
 // ───────────── Equipment ─────────────
-const GEAR = { plate: '#2f3542', hub: '#5d6676', bar: '#9aa3b2', far: '#7d8595' };
+const GEAR = { plate: C.charcoal, hub: C.slate, bar: mix(C.slate, C.white, 0.35), far: mix(C.slate, C.white, 0.15), ring: mix(C.charcoal, C.white, 0.12) };
 const unit = (v) => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
 const grip = (J, s) => { const F = unit([J['hand' + s][0] - J['elbow' + s][0], J['hand' + s][1] - J['elbow' + s][1]]); return { p: [J['hand' + s][0] + F[0], J['hand' + s][1] + F[1]], F }; };
 const f2 = (n) => n.toFixed(2);
 
-export const BAND_COLORS = ['#e8c21c', '#e0473c', '#2fa55a', '#2f7fd8', '#2d3240']; // extra light → extra heavy
+export const BAND_COLORS = [C.lime, C.coral, C.green, C.ocean, C.charcoal]; // extra light → extra heavy
 
 function bandParts(J, gear, view, anchor, color) {
   const out = { far: [], near: [], pts: [] };
@@ -165,7 +166,7 @@ function gearParts(J, gear, view, anchor, color = BAND_COLORS[2]) {
     } else c = side ? grip(J, 'R').p : [(grip(J, 'L').p[0] + grip(J, 'R').p[0]) / 2, (grip(J, 'L').p[1] + grip(J, 'R').p[1]) / 2];
     if (side) {
       circle(out.near, c, 7.4, GEAR.plate);
-      out.near.push({ tag: 'circle', cx: f2(c[0]), cy: f2(c[1]), r: 5.6, fill: 'none', stroke: '#3c4352', 'stroke-width': 0.6 });
+      out.near.push({ tag: 'circle', cx: f2(c[0]), cy: f2(c[1]), r: 5.6, fill: 'none', stroke: GEAR.ring, 'stroke-width': 0.6 });
       out.near.push({ tag: 'circle', cx: f2(c[0]), cy: f2(c[1]), r: 1.6, fill: GEAR.hub });
       out.near.push({ tag: 'circle', cx: f2(c[0]), cy: f2(c[1]), r: 0.8, fill: GEAR.bar });
     } else {

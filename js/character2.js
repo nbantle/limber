@@ -1,4 +1,7 @@
 // Coach character renderer. The app uses the Studio style; the others remain for comparison (dev/character-options.html).
+// Studio colors come from the Limber palette (palette.js), except natural skin tones and hair.
+
+import { C, mix } from './palette.js';
 // Draws a body with shaped (muscle-profile) limbs, clothing, faces, and three views
 // (front, side, back) over the joints produced by figure.js.
 
@@ -6,11 +9,8 @@ const f = (n) => n.toFixed(2);
 const add = (p, v, s = 1) => [p[0] + v[0] * s, p[1] + v[1] * s];
 const norm = (v) => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
 
-function shade(hex, amt) {
-  const n = parseInt(hex.slice(1), 16);
-  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.max(0, Math.min(255, Math.round(amt > 0 ? v * (1 - amt) : v + (255 - v) * -amt))));
-  return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
-}
+// Darken toward Charcoal (amt > 0) or lighten toward White (amt < 0), so shading stays in the palette family.
+const shade = (hex, amt) => (amt > 0 ? mix(hex, C.charcoal, Math.min(1, amt * 1.15)) : mix(hex, C.white, -amt));
 
 // Smooth closed path through points (Catmull-Rom → cubic Bézier).
 function smooth(pts, open = false) {
@@ -133,8 +133,8 @@ export const STYLES = {
     outline: null, scale: 1, head: 1.1, shadow: true, face: 'full', highlight: 'dash',
     skin: '#eab38e',
     people: {
-      ava: { hair: '#4a2c22', top: '#ff6b8f', bottom: '#30364a', stripe: '#ff8fab', shoe: '#ff5a86', tie: '#ffd166', fem: true },
-      max: { hair: '#2a211d', top: '#2f80ed', bottom: '#28303f', stripe: '#4f5b73', shoe: '#ff8a3d', fem: false },
+      ava: { hair: '#4a2c22', top: C.violet, bottom: C.charcoal, stripe: mix(C.violet, C.white, 0.35), shoe: C.green, tie: C.lime, fem: true },
+      max: { hair: '#2a211d', top: C.ocean, bottom: C.charcoal, stripe: C.slate, shoe: C.green, fem: false },
     },
   },
   bold: {
@@ -159,7 +159,8 @@ export const STYLES = {
   },
 };
 
-const HL = '#ff5a1f';
+const HL = C.coral; // worked-muscle highlight
+const LIPS = mix(C.coral, C.charcoal, 0.35);
 const GLUTE_R = 4.2; // matches GLUTE.r in figure.js
 
 // App-facing look: which coach and skin tone the Studio character uses.
@@ -221,7 +222,7 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       push(part(f1, p1, 0, 1, { scale: sc }), far(legCol, isFar));
       if (!who.mono && !fem) {
         push(part(f1, p1, -0.05, 0.55, { grow: 0.55, capB: false, scale: sc }), far(who.bottom, isFar));
-        push(part(f2, p2, 0.8, 0.95, { grow: 0.12, capA: false, capB: false, scale: sc }), far('#ffffff', isFar));
+        push(part(f2, p2, 0.8, 0.95, { grow: 0.12, capA: false, capB: false, scale: sc }), far(C.white, isFar));
       }
       shoe(s, isFar);
     }
@@ -257,7 +258,7 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       const C = add(A, D, 0.6 * sc);
       const at = ([x, y]) => [C[0] + (X[0] * x + D[0] * y) * sc, C[1] + (X[1] * x + D[1] * y) * sc];
       push(smooth([[-1.9, -1.2], [1.9, -1.2], [2.3, 0.6], [1.6, 1.9], [-1.6, 1.9], [-2.3, 0.6]].map(at)), far(who.shoe, isFar));
-      push(smooth([[-2.3, 1.1], [2.3, 1.1], [1.8, 2.15], [-1.8, 2.15]].map(at)), far('#f4f4f6', isFar));
+      push(smooth([[-2.3, 1.1], [2.3, 1.1], [1.8, 2.15], [-1.8, 2.15]].map(at)), far(C.mist, isFar));
       return;
     }
     if (G[1] < 0) G = [-G[0], -G[1]]; // sole faces down
@@ -265,8 +266,8 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
     const upper = [[-1.9, -1.5], [-0.4, -2.3], [2.4, -1.4], [5.6, -0.4], [6.8, 0.6], [6.6, 1.5], [-1.7, 1.5], [-2.1, 0.2]].map(([x, y]) => L(x, y));
     push(smooth(upper), far(who.shoe, isFar));
     const sole = [[-1.9, 1.0], [6.8, 1.0], [6.6, 2.0], [-1.7, 2.0]].map(([x, y]) => L(x, y));
-    push(smooth(sole), far('#f4f4f6', isFar));
-    ops.push({ tag: 'path', d: `M${f(L(1.2, -1.2)[0])} ${f(L(1.2, -1.2)[1])}L${f(L(3.6, -0.6)[0])} ${f(L(3.6, -0.6)[1])}`, stroke: far('#ffffff', isFar), 'stroke-width': 0.45, 'stroke-linecap': 'round', 'stroke-dasharray': '0.5 0.8', fill: 'none', opacity: 0.85 });
+    push(smooth(sole), far(C.mist, isFar));
+    ops.push({ tag: 'path', d: `M${f(L(1.2, -1.2)[0])} ${f(L(1.2, -1.2)[1])}L${f(L(3.6, -0.6)[0])} ${f(L(3.6, -0.6)[1])}`, stroke: far(C.white, isFar), 'stroke-width': 0.45, 'stroke-linecap': 'round', 'stroke-dasharray': '0.5 0.8', fill: 'none', opacity: 0.85 });
   };
 
   // Side-view seat: a round glute behind the hip (see GLUTE in figure.js).
@@ -359,10 +360,10 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       if (fem) ell(Q(-0.72, 0.72), 0.14, 0.16, who.tie);
       ell(Q(-0.2, -0.05), 0.15, 0.22, shade(skin, 0.12)); // ear
       if (S.face !== 'none') {
-        ell(Q(0.56, 0.1), S.face === 'simple' ? 0.11 : 0.09, S.face === 'simple' ? 0.11 : 0.13, '#2a2733', { opacity: 1 });
+        ell(Q(0.56, 0.1), S.face === 'simple' ? 0.11 : 0.09, S.face === 'simple' ? 0.11 : 0.13, C.charcoal, { opacity: 1 });
         if (S.face === 'full') line([[0.42, 0.34], [0.66, 0.36]], who.hair, 0.09);
-        line([[0.6, -0.48], [0.76, -0.46]], '#b0605a', 0.07);
-        ell(Q(0.48, -0.25), 0.15, 0.1, '#ff7a8a', { opacity: 0.35 });
+        line([[0.6, -0.48], [0.76, -0.46]], LIPS, 0.07);
+        ell(Q(0.48, -0.25), 0.15, 0.1, C.coral, { opacity: 0.35 });
       }
       return;
     }
@@ -387,11 +388,11 @@ export function paint2(J, view, styleKey, personKey, hot = [], hotSegs = null, s
       for (const x of [-0.32, 0.32]) {
         const xx = x + tn;
         if (Math.abs(xx) > 0.78) continue;
-        ell(Q(xx, 0.06), S.face === 'simple' ? 0.11 : 0.09, S.face === 'simple' ? 0.11 : 0.13, '#2a2733', { opacity: 1 });
+        ell(Q(xx, 0.06), S.face === 'simple' ? 0.11 : 0.09, S.face === 'simple' ? 0.11 : 0.13, C.charcoal, { opacity: 1 });
         if (S.face === 'full') line([[xx - 0.13, 0.3], [xx + 0.13, 0.31]], who.hair, 0.08);
-        ell(Q(xx * 1.35, -0.3), 0.14, 0.09, '#ff7a8a', { opacity: 0.35 });
+        ell(Q(xx * 1.35, -0.3), 0.14, 0.09, C.coral, { opacity: 0.35 });
       }
-      line([[-0.16 + tn, -0.44], [tn, -0.52], [0.16 + tn, -0.44]], '#b0605a', 0.07);
+      line([[-0.16 + tn, -0.44], [tn, -0.52], [0.16 + tn, -0.44]], LIPS, 0.07);
     }
   };
 
