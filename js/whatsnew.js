@@ -5,7 +5,7 @@ export const RELEASES = [
     id: 6,
     date: 'October 2026',
     items: [
-      ['body', 'Knee rehab', 'New routines in Explore for knee recovery — week 1 and week 2 strength plus balance — and 13 new knee-friendly exercises.'],
+      ['body', 'Knee rehab', 'New routines in Explore for knee recovery — week 1 and week 2 strength plus balance — and 9 new knee-friendly exercises.'],
     ],
   },
   {

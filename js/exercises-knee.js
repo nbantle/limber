@@ -1,51 +1,12 @@
-// Knee care: gentle mobility, quad and hip strength, and balance work used in knee (e.g. meniscus) recovery plans.
+// Knee care: quad and hip strength, and balance work used in knee (e.g. meniscus) recovery plans.
 // Same shape as exercises.js. Depths are kept shallow on purpose — nothing here bends the knee past about 90°.
 
 const STAND = { t: 0, aL: [178, 178], aR: [182, 182] };
 const SUPINE = { t: 270, h: 270, aL: [97, 99], aR: [97, 99] }; // lying on the back, arms resting at the sides
 const LEG_STRAIGHT = [90, 90, 0]; // lying, leg along the floor, toes up
 const LEG_BENT = [45, 150]; // lying, knee up, foot flat
-const CHAIR = [{ type: 'chair', at: 'hip' }];
 
 export const KNEE = [
-  // ───────────── Daily mobility ─────────────
-  {
-    id: 'heel-slides', name: 'Heel Slides', type: 'stretch', mode: 'reps', reps: 15, sided: true,
-    primary: ['quads', 'hamstrings'], secondary: ['hipFlexors'],
-    cues: ['Lie on your back with both legs straight.', 'Slowly slide one heel toward your glutes until you feel a gentle stretch.', 'Pause, then slide it back out until the leg is straight.', 'Keep the heel on the floor the whole time.'],
-    anim: { arrow: 'ankleR', dur: 1.6, frames: [
-      { ...SUPINE, lL: LEG_STRAIGHT, lR: LEG_STRAIGHT },
-      { ...SUPINE, lL: LEG_STRAIGHT, lR: [52, 144, 60] },
-    ] },
-  },
-  {
-    id: 'quad-sets', name: 'Quad Sets', type: 'strength', mode: 'reps', reps: 10, sided: true,
-    primary: ['quads'], secondary: [],
-    cues: ['Lie or sit with your leg straight.', 'Tighten the thigh and press the back of your knee down into the floor.', 'Hold for 5 seconds — your kneecap should pull up slightly.', 'Relax fully, then repeat.'],
-    anim: { arrow: 'kneeR', dur: 2.5, hold: 0.6, frames: [
-      { ...SUPINE, lL: LEG_STRAIGHT, lR: [86, 95, 5] },
-      { ...SUPINE, lL: LEG_STRAIGHT, lR: [90, 90, 345] },
-    ] },
-  },
-  {
-    id: 'straight-leg-hang', name: 'Straight-Leg Hang', type: 'stretch', mode: 'time', duration: 120, sided: true,
-    primary: ['hamstrings'], secondary: ['calves'],
-    cues: ['Sit and rest your heel on a stool or chair, knee unsupported.', 'Let the leg relax so gravity gently straightens the knee.', 'Breathe and stay loose — no forcing.', 'Stop if you feel pinching behind the knee.'],
-    anim: { props: [...CHAIR, { type: 'box', at: 'ankleR', dx: 0, dy: 2.6, w: 9 }], anchor: 'hip', dur: 3, frames: [
-      { t: -6, aL: [160, 110], aR: [160, 110], lL: [90, 180], lR: [90, 94, 0] },
-      { t: -6, aL: [160, 110], aR: [160, 110], lL: [90, 180], lR: [91, 92, 0] },
-    ] },
-  },
-  {
-    id: 'ankle-pumps', name: 'Ankle Pumps', type: 'stretch', mode: 'reps', reps: 20,
-    primary: ['calves'], secondary: [],
-    cues: ['Lie down with your legs straight, ideally raised on a pillow.', 'Point your toes away from you.', 'Then pull them back toward your shins.', 'Keep a steady rhythm — it helps move swelling out of the leg.'],
-    anim: { arrow: 'toeR', dur: 0.8, frames: [
-      { ...SUPINE, lL: [90, 90, 40], lR: [90, 90, 40] },
-      { ...SUPINE, lL: [90, 90, 330], lR: [90, 90, 330] },
-    ] },
-  },
-
   // ───────────── Strength ─────────────
   {
     id: 'straight-leg-raise', name: 'Straight-Leg Raise', type: 'strength', mode: 'reps', reps: 10, sided: true,
