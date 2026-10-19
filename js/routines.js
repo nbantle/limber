@@ -140,17 +140,17 @@ export const EXPLORE = [
   // Moves marked ONE are for the injured leg only (switch on "Both sides" in the editor to do both).
   {
     id: 'x-knee-strength-1', name: 'Knee Rehab: Week 1 Strength', goal: 'Recovery', level: 'Beginner', rest: 30,
-    desc: 'Four days a week (Mon, Wed, Fri, Sun) in week 1. Rebuilds the quad and hips without deep bending — wall sits stay at about 45°. Ice 10–15 minutes afterward if it aches.',
+    desc: 'Every day in week 1. Rebuilds the quad and hips without deep bending — wall sits stay at about 45°. Ice 10–15 minutes afterward if it aches.',
     steps: [R('straight-leg-raise', 10, 3, ONE), R('glute-bridge', 12, 3), R('side-lying-leg-raise', 12, 2), T('wall-sit-shallow', 20, { sets: 3 }), R('calf-raises', 15, 2)],
   },
   {
     id: 'x-knee-strength-2', name: 'Knee Rehab: Week 2 Strength', goal: 'Recovery', level: 'Intermediate', rest: 30,
-    desc: 'Week 2, four days a week — only if the knee is no worse than when you started. Add a 2–5 lb ankle weight to the leg raises and do bridges single-leg if pain-free. Never squat or wall sit past 60°.',
+    desc: 'Every day in week 2 — only if the knee is no worse than when you started. Add a 2–5 lb ankle weight to the leg raises and do bridges single-leg if pain-free. Never squat or wall sit past 60°.',
     steps: [R('straight-leg-raise', 12, 3, ONE), R('glute-bridge', 10, 3), R('mini-squat', 12, 3), R('step-up', 10, 3), R('standing-hamstring-curl', 12, 3), T('wall-sit-shallow', 30, { sets: 3 })],
   },
   {
     id: 'x-knee-balance', name: 'Knee Rehab: Balance', goal: 'Recovery', level: 'Beginner', rest: 10,
-    desc: 'Daily in week 2, after your strength work or on its own. Barefoot, next to a wall. Only try eyes closed once eyes-open is easy.',
+    desc: 'Daily in week 2, right after your strength routine. Barefoot, next to a wall. Only try eyes closed once eyes-open is easy.',
     steps: [T('single-leg-stand', 30, { sets: 3 }), T('single-leg-stand-eyes-closed', 15, { sets: 3 }), T('tandem-walk', 30, { sets: 2 })],
   },
   {
