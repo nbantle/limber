@@ -5,6 +5,7 @@
 import { MORE, AREAS } from './exercises-more.js';
 import { WEIGHTS } from './exercises-weights.js';
 import { BANDS } from './exercises-bands.js';
+import { KNEE } from './exercises-knee.js';
 
 export { AREAS };
 
@@ -429,7 +430,7 @@ export const EXERCISES = [
   },
 ];
 
-EXERCISES.push(...MORE, ...WEIGHTS, ...BANDS);
+EXERCISES.push(...MORE, ...WEIGHTS, ...BANDS, ...KNEE);
 
 export const STARTER_ROUTINES = [
   {

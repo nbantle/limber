@@ -2,6 +2,13 @@
 // the app shows everything newer than the last note a person has seen, once, after the update loads.
 export const RELEASES = [
   {
+    id: 6,
+    date: 'October 2026',
+    items: [
+      ['body', 'Knee rehab', 'Four new routines in Explore for knee recovery — daily mobility, week 1 and week 2 strength, and balance — plus 13 new knee-friendly exercises.'],
+    ],
+  },
+  {
     id: 5,
     date: 'October 2026',
     items: [

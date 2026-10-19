@@ -4,6 +4,7 @@
 
 const T = (ex, duration, extra = {}) => ({ ex, mode: 'time', duration, ...extra }); // timed
 const R = (ex, reps, sets = 1, extra = {}) => ({ ex, mode: 'reps', reps, sets, ...extra }); // reps
+const ONE = { sides: 'one' }; // a sided exercise done on one leg only
 
 export const GOALS = ['Full Workout', 'Stretch & Mobility', 'Strength', 'Cardio & HIIT', 'Core', 'Recovery', 'Desk & Travel'];
 export const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
@@ -135,6 +136,28 @@ export const EXPLORE = [
   },
 
   // ───────────── Recovery ─────────────
+  // Knee rehab (e.g. a meniscus sprain): keep pain at or below 3/10 and settled within an hour.
+  // Moves marked ONE are for the injured leg only (switch on "Both sides" in the editor to do both).
+  {
+    id: 'x-knee-mobility', name: 'Knee Rehab: Daily Mobility', goal: 'Recovery', level: 'Beginner', rest: 10,
+    desc: 'Morning and evening, every day. Gets the knee bending and fully straightening, wakes up the quad, and pumps out swelling. Keep pain at 3/10 or less. Not medical advice — stop if the knee locks or gives way.',
+    steps: [R('heel-slides', 15, 2, ONE), R('quad-sets', 10, 2, ONE), T('straight-leg-hang', 120, ONE), R('ankle-pumps', 20)],
+  },
+  {
+    id: 'x-knee-strength-1', name: 'Knee Rehab: Week 1 Strength', goal: 'Recovery', level: 'Beginner', rest: 30,
+    desc: 'Four days a week (Mon, Wed, Fri, Sun) in week 1. Rebuilds the quad and hips without deep bending — wall sits stay at about 45°. Ice 10–15 minutes afterward if it aches.',
+    steps: [R('straight-leg-raise', 10, 3, ONE), R('glute-bridge', 12, 3), R('side-lying-leg-raise', 12, 2), T('wall-sit-shallow', 20, { sets: 3 }), R('calf-raises', 15, 2)],
+  },
+  {
+    id: 'x-knee-strength-2', name: 'Knee Rehab: Week 2 Strength', goal: 'Recovery', level: 'Intermediate', rest: 30,
+    desc: 'Week 2, four days a week — only if the knee is no worse than when you started. Add a 2–5 lb ankle weight to the leg raises and do bridges single-leg if pain-free. Never squat or wall sit past 60°.',
+    steps: [R('straight-leg-raise', 12, 3, ONE), R('glute-bridge', 10, 3), R('mini-squat', 12, 3), R('step-up', 10, 3), R('standing-hamstring-curl', 12, 3), T('wall-sit-shallow', 30, { sets: 3 })],
+  },
+  {
+    id: 'x-knee-balance', name: 'Knee Rehab: Balance', goal: 'Recovery', level: 'Beginner', rest: 10,
+    desc: 'Daily in week 2, right after the evening mobility routine. Barefoot, next to a wall. Only try eyes closed once eyes-open is easy.',
+    steps: [T('single-leg-stand', 30, { sets: 3 }), T('single-leg-stand-eyes-closed', 15, { sets: 3 }), T('tandem-walk', 30, { sets: 2 })],
+  },
   {
     id: 'x-lower-back', name: 'Lower Back Relief', goal: 'Recovery', level: 'Beginner', rest: 5,
     desc: 'Gentle stretches plus a little core work for a stiff lower back. Stop any move that sends pain down your leg or makes it worse.',
