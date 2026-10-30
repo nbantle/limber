@@ -11,7 +11,7 @@ import { RELEASES } from './whatsnew.js';
 // ───────────────────────── Storage ─────────────────────────
 
 const KEY = 'limber.v1';
-const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, switchTime: 5, coach: 'a', skin: 1, units: 'lb', reminder: { days: [], time: '07:00' }, theme: 'auto', stats: true };
+const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, ready: 3, switchTime: 5, coach: 'a', skin: 1, units: 'lb', reminder: { days: [], time: '07:00' }, theme: 'auto', stats: true };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -369,6 +369,8 @@ function buildPhases(routine) {
     for (let set = 1; set <= si.sets; set++) {
       sides.forEach((side, k) => {
         if (k > 0 && S.switchTime > 0) P.push({ kind: 'switch', dur: S.switchTime, side });
+        // A short countdown before each exercise starts (the first one already has the get-ready phase).
+        if (S.ready > 0 && !['prep', 'switch'].includes(P.at(-1)?.kind)) P.push({ kind: 'ready', dur: S.ready });
         P.push({ kind: 'work', ex: si.ex, mode: si.mode, dur: si.mode === 'time' ? si.duration : null, reps: si.reps, weight: si.weight, band: si.band, side, set, sets: si.sets, step: idx, sid: s.id });
       });
       if (set < si.sets && si.setRest > 0) P.push({ kind: 'rest', dur: si.setRest });
@@ -684,7 +686,7 @@ function relDate(iso) {
 }
 
 function startRoutine(id) {
-  audio.unlock();
+  audio.unlock({ beeps: db.settings.beeps, speech: db.settings.voice });
   const r = getRoutine(id);
   stats.event('workout-start', r?.from ? EXPLORE.find((x) => x.id === r.from)?.name ?? 'Custom' : 'Custom');
   location.hash = `#/play/${id}`;
@@ -1472,7 +1474,8 @@ function viewSettings() {
       <h3>During a routine</h3>
       ${tog('voice', 'Voice guidance', 'Announces each exercise and side')}
       ${tog('beeps', 'Countdown beeps', '3-2-1 before each change')}
-      <label class="switch-row"><span>Get ready time</span>${stepper('prep', S.prep, 5, 0, 60, 's')}</label>
+      <label class="switch-row"><span>Get ready at the start</span>${stepper('prep', S.prep, 5, 0, 60, 's')}</label>
+      <label class="switch-row"><span>Countdown before each exercise</span>${stepper('ready', S.ready, 1, 0, 10, 's')}</label>
       <label class="switch-row"><span>Switch sides pause</span>${stepper('switchTime', S.switchTime, 1, 0, 30, 's')}</label>
       <div class="switch-row"><span>Weight units</span><div class="seg units">${['lb', 'kg'].map((u) => `<button data-units="${u}" class="${S.units === u ? 'on' : ''}">${u}</button>`).join('')}</div></div>
       <button class="btn ghost wide" data-act="test">Test sound</button>
@@ -1527,7 +1530,7 @@ function viewSettings() {
     }
     if (t.dataset.act === 'feedback') { openFeedback(); return; }
     if (t.dataset.act === 'whatsnew') { openWhatsNew(); return; }
-    if (t.dataset.act === 'test') { audio.unlock(); audio.beep(660); setTimeout(() => audio.beep(990, 0.25), 300); if (S.voice) setTimeout(() => audio.speak('Voice guidance is on.'), 700); }
+    if (t.dataset.act === 'test') { audio.unlock({ speech: S.voice }); audio.beep(660); setTimeout(() => audio.beep(990, 0.25), 300); if (S.voice) setTimeout(() => audio.speak('Voice guidance is on.'), 700); }
     if (t.dataset.act === 'export') {
       const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
@@ -1677,16 +1680,18 @@ function viewPlayer(id) {
       workChips(p);
       setFigure(p.ex, false, p.band);
       rotateCues(p.ex);
-      if (!silent) { beep(1046, 0.22); say(describe(p)); }
+      // Coming out of the countdown the name has just been said, so only the go beep plays.
+      if (!silent) { beep(1046, 0.22); if (phases[idx - 1]?.kind !== 'ready') say(describe(p)); }
     } else {
       const n = p.next;
-      el.kicker.textContent = p.kind === 'prep' ? 'Get ready' : p.kind === 'switch' ? 'Switch sides' : 'Rest';
-      el.name.textContent = p.kind === 'switch' ? `${p.side} side next` : n ? `Next: ${n.ex.name}` : 'Almost done';
+      el.kicker.textContent = p.kind === 'prep' || p.kind === 'ready' ? 'Get ready' : p.kind === 'switch' ? 'Switch sides' : 'Rest';
+      el.name.textContent = p.kind === 'switch' ? `${p.side} side next` : p.kind === 'ready' && n ? n.ex.name : n ? `Next: ${n.ex.name}` : 'Almost done';
       el.chips.innerHTML = (n ? `<span class="chip">${n.mode === 'time' ? fmtTime(n.dur) : `${n.reps} reps`}${n.weight ? ` · ${fmtWeight(n.weight)}` : ''}${n.band !== null ? ` · ${fmtBand(n.band)}` : ''}${n.side ? ` · ${n.side}` : ''}</span>` : '')
         + `<button class="chip skip" data-act="next">${p.kind === 'rest' ? 'Skip rest' : 'Skip'} ›</button>`;
-      if (n) { setFigure(n.ex, true, n.band); rotateCues(n.ex); }
+      if (n) { setFigure(n.ex, p.kind !== 'ready', n.band); rotateCues(n.ex); }
       if (!silent) {
-        if (p.kind === 'prep') say(`Get ready. First up: ${n ? describe(n) : ''}`);
+        if (p.kind === 'ready') { beep(660, 0.1); if (n) say(`${n.side ? `${n.side} ` : ''}${n.ex.name}`); }
+        else if (p.kind === 'prep') say(`Get ready. First up: ${n ? describe(n) : ''}`);
         else if (p.kind === 'switch') say(`Switch to the ${p.side.toLowerCase()} side.`);
         else say(n ? `Rest. Next up: ${n.ex.name}${n.side ? `, ${n.side.toLowerCase()} side` : ''}.` : 'Rest.');
       }
@@ -1807,7 +1812,7 @@ function viewPlayer(id) {
       lastWhole = whole;
       el.ring.style.strokeDashoffset = String(RING_C * (1 - remain / total));
       el.timeB.textContent = fmtClock(remain / 1000);
-      el.timeS.textContent = p.kind === 'work' ? (p.side ? `${p.side} side` : 'remaining') : p.kind === 'prep' ? 'starting in' : p.kind === 'switch' ? 'switch' : 'rest';
+      el.timeS.textContent = p.kind === 'work' ? (p.side ? `${p.side} side` : 'remaining') : p.kind === 'prep' || p.kind === 'ready' ? 'starting in' : p.kind === 'switch' ? 'switch' : 'rest';
     } else {
       el.ring.style.strokeDashoffset = '0';
       el.timeB.textContent = `${p.reps}`;
@@ -1851,7 +1856,7 @@ function viewPlayer(id) {
     const p = phase();
     switch (t.dataset.act) {
       case 'main':
-        if (!audio.unlocked) audio.unlock();
+        if (!audio.unlocked) audio.unlock({ beeps: S.beeps, speech: S.voice });
         if (paused()) resume();
         else if (p.kind === 'work' && p.mode === 'reps') next({ done: true });
         else pause();

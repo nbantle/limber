@@ -1,6 +1,10 @@
 // Beeps (Web Audio), spoken cues (speech synthesis), and screen wake lock.
 // iOS only allows audio after a user gesture, so call unlock() from a tap handler.
 
+// Mix with whatever else is playing (an audiobook, podcast or music) instead of taking over and pausing it.
+// Safari 16.4+; elsewhere this is a no-op. 'ambient' also follows the ring/silent switch.
+try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch { /* unsupported */ }
+
 let ctx = null;
 let voice = null;
 
@@ -17,15 +21,16 @@ if ('speechSynthesis' in window) {
 export const audio = {
   unlocked: false,
 
-  unlock() {
-    try {
+  // beeps / speech: only wake the outputs that will actually be used, so nothing grabs the audio for no reason.
+  unlock({ beeps = true, speech = true } = {}) {
+    if (beeps) try {
       ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
       if (ctx.state === 'suspended') ctx.resume();
       // A silent blip primes the output on iOS.
       const o = ctx.createOscillator(), g = ctx.createGain();
       g.gain.value = 0.0001; o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.02);
     } catch { /* no audio available */ }
-    try {
+    if (speech) try {
       if ('speechSynthesis' in window) {
         const u = new SpeechSynthesisUtterance(' ');
         u.volume = 0;

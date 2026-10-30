@@ -2,6 +2,14 @@
 // the app shows everything newer than the last note a person has seen, once, after the update loads.
 export const RELEASES = [
   {
+    id: 7,
+    date: 'October 2026',
+    items: [
+      ['clock', '3-second get ready', 'Before every exercise Limber says its name and counts you in 3-2-1, then the timer starts. Change the length in Settings.'],
+      ['play', 'Plays nice with audiobooks', 'Beeps and voice now play over your audiobook, podcast or music instead of stopping it.'],
+    ],
+  },
+  {
     id: 6,
     date: 'October 2026',
     items: [
