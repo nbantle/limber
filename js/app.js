@@ -11,7 +11,7 @@ import { RELEASES } from './whatsnew.js';
 // ───────────────────────── Storage ─────────────────────────
 
 const KEY = 'limber.v1';
-const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, ready: 3, switchTime: 5, coach: 'a', skin: 1, units: 'lb', reminder: { days: [], time: '07:00' }, theme: 'auto', stats: true };
+const DEFAULT_SETTINGS = { voice: true, beeps: true, prep: 5, ready: 3, switchTime: 5, moan: false, coach: 'a', skin: 1, units: 'lb', reminder: { days: [], time: '07:00' }, theme: 'auto', stats: true };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -686,7 +686,7 @@ function relDate(iso) {
 }
 
 function startRoutine(id) {
-  audio.unlock({ beeps: db.settings.beeps, speech: db.settings.voice });
+  audio.unlock({ beeps: db.settings.beeps || db.settings.moan, speech: db.settings.voice });
   const r = getRoutine(id);
   stats.event('workout-start', r?.from ? EXPLORE.find((x) => x.id === r.from)?.name ?? 'Custom' : 'Custom');
   location.hash = `#/play/${id}`;
@@ -1474,6 +1474,7 @@ function viewSettings() {
       <h3>During a routine</h3>
       ${tog('voice', 'Voice guidance', 'Announces each exercise and side')}
       ${tog('beeps', 'Countdown beeps', '3-2-1 before each change')}
+      ${tog('moan', 'Stretch moan', 'A random stretchy groan during some stretches. Just for fun.')}
       <label class="switch-row"><span>Get ready at the start</span>${stepper('prep', S.prep, 5, 0, 60, 's')}</label>
       <label class="switch-row"><span>Countdown before each exercise</span>${stepper('ready', S.ready, 1, 0, 10, 's')}</label>
       <label class="switch-row"><span>Switch sides pause</span>${stepper('switchTime', S.switchTime, 1, 0, 30, 's')}</label>
@@ -1562,6 +1563,22 @@ function viewSettings() {
 // ───────────────────────── Player ─────────────────────────
 
 const RING_C = 2 * Math.PI * 54;
+
+// "Stretch moan" (Settings): now and then, partway through a timed stretch, play one of these at random.
+const MOANS = [1, 2, 3, 4, 5, 6].map((i) => `sounds/moan-${i}.mp3`);
+const MOAN_CHANCE = 1 / 3;
+let lastMoan = -1;
+// When to moan during this stretch (ms into it), or null. Somewhere in the middle, never near the 3-2-1.
+function moanTime(p) {
+  if (p.ex.type !== 'stretch' || p.mode !== 'time' || !p.dur || Math.random() >= MOAN_CHANCE) return null;
+  const lo = Math.max(2500, p.dur * 300), hi = Math.min(p.dur * 700, p.dur * 1000 - 4500);
+  return hi > lo ? lo + Math.random() * (hi - lo) : null;
+}
+function playMoan() {
+  let i = Math.floor(Math.random() * MOANS.length);
+  if (i === lastMoan) i = (i + 1) % MOANS.length;
+  if (audio.play(MOANS[i], 0.9)) lastMoan = i;
+}
 
 function viewPlayer(id) {
   const r = getRoutine(id);
@@ -1682,6 +1699,7 @@ function viewPlayer(id) {
       rotateCues(p.ex);
       // Coming out of the countdown the name has just been said, so only the go beep plays.
       if (!silent) { beep(1046, 0.22); if (phases[idx - 1]?.kind !== 'ready') say(describe(p)); }
+      p.moanAt = S.moan ? moanTime(p) : null;
     } else {
       const n = p.next;
       el.kicker.textContent = p.kind === 'prep' || p.kind === 'ready' ? 'Get ready' : p.kind === 'switch' ? 'Switch sides' : 'Rest';
@@ -1810,6 +1828,11 @@ function viewPlayer(id) {
         else if (p.dur >= 40) say('Halfway.');
       }
       lastWhole = whole;
+      // Stretch moan: wait for the voice to finish; give up if it would run into the final countdown.
+      if (p.moanAt != null && e >= p.moanAt) {
+        if (remain < 4000) p.moanAt = null;
+        else if (!audio.speaking) { p.moanAt = null; playMoan(); }
+      }
       el.ring.style.strokeDashoffset = String(RING_C * (1 - remain / total));
       el.timeB.textContent = fmtClock(remain / 1000);
       el.timeS.textContent = p.kind === 'work' ? (p.side ? `${p.side} side` : 'remaining') : p.kind === 'prep' || p.kind === 'ready' ? 'starting in' : p.kind === 'switch' ? 'switch' : 'rest';
@@ -1856,7 +1879,7 @@ function viewPlayer(id) {
     const p = phase();
     switch (t.dataset.act) {
       case 'main':
-        if (!audio.unlocked) audio.unlock({ beeps: S.beeps, speech: S.voice });
+        if (!audio.unlocked) { audio.unlock({ beeps: S.beeps || S.moan, speech: S.voice }); if (S.moan) audio.load(MOANS); }
         if (paused()) resume();
         else if (p.kind === 'work' && p.mode === 'reps') next({ done: true });
         else pause();
@@ -1900,6 +1923,7 @@ function viewPlayer(id) {
   // Start immediately if audio was unlocked by the tap that got us here; otherwise wait for a tap.
   wakeLock.on();
   if (audio.unlocked) { runningSince = now(); sessionSince = now(); }
+  if (S.moan && audio.unlocked) audio.load(MOANS);
   enter(0, { silent: !audio.unlocked });
   if (!audio.unlocked) { el.kicker.textContent = 'Ready'; el.timeS.textContent = 'tap play to start'; }
 

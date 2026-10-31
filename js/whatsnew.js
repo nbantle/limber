@@ -2,6 +2,13 @@
 // the app shows everything newer than the last note a person has seen, once, after the update loads.
 export const RELEASES = [
   {
+    id: 8,
+    date: 'October 2026',
+    items: [
+      ['spark', 'Stretch moan', 'A new just-for-fun option: now and then a stretch lets out a groan. Turn it on in Settings → During a routine.'],
+    ],
+  },
+  {
     id: 7,
     date: 'October 2026',
     items: [

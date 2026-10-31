@@ -7,6 +7,7 @@ try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } cat
 
 let ctx = null;
 let voice = null;
+const clips = new Map(); // url → decoded AudioBuffer (short sound effects)
 
 function pickVoice() {
   const voices = window.speechSynthesis?.getVoices?.() ?? [];
@@ -56,6 +57,30 @@ export const audio = {
       o.stop(t + dur + 0.02);
     } catch { /* ignore */ }
   },
+
+  // Fetch and decode short sound files once, ready to play instantly (needs unlock() first).
+  async load(urls) {
+    if (!ctx) return;
+    await Promise.all(urls.filter((u) => !clips.has(u)).map(async (u) => {
+      try { clips.set(u, await ctx.decodeAudioData(await (await fetch(u)).arrayBuffer())); } catch { /* skip a bad file */ }
+    }));
+  },
+
+  // Play a loaded clip; false if it isn't ready.
+  play(url, vol = 1) {
+    const buf = clips.get(url);
+    if (!ctx || !buf) return false;
+    try {
+      if (ctx.state === 'suspended') ctx.resume();
+      const src = ctx.createBufferSource(), g = ctx.createGain();
+      src.buffer = buf; g.gain.value = vol;
+      src.connect(g).connect(ctx.destination);
+      src.start();
+      return true;
+    } catch { return false; }
+  },
+
+  get speaking() { return !!window.speechSynthesis?.speaking; },
 
   speak(text) {
     if (!('speechSynthesis' in window) || !text) return;
